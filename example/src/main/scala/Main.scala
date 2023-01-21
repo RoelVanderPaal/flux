@@ -4,7 +4,8 @@ import org.scalajs.dom.{document, Event, MouseEvent}
 
 case class Button(label: String) {
   val clicks = Subject[MouseEvent]()
-  val view   = button(onclick := clicks, disabled := false)(label)
+  val value  = classStyle := Set(_hover := Set(backgroundColor := "green"))
+  val view   = button(onclick := clicks, value, disabled := false)(label)
 }
 object Main extends App {
   val ticker = {

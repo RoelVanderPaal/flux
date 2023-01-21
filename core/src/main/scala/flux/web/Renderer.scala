@@ -18,14 +18,14 @@ object Renderer {
     }
     def handleProperty[Value](element: Element)(p: Property[Value, _])                                   = {
       def setAttribute[Value](key: WritableName[_, _], value: Value) = value match {
-        case ps: Iterable[CssProperty] =>
+        case ps: Iterable[CssProperty | SelectorProperty] =>
           val className = s"flux-${ps.map(_.toString).hashCode()}"
           if (!classNames.contains(className)) {
             classNames += className
             addStyleSheet(cssProperties2String(className, ps))
           }
           element.setAttribute("class", className)
-        case _                         =>
+        case _                                            =>
           value match {
             case b: Boolean => if (b) Some("") else None
             case v          => Some(v.toString)
@@ -97,9 +97,21 @@ object Renderer {
 
   }
 
-  def cssProperties2String(className: String, properties: Iterable[CssProperty]) = {
-    val body = properties.map(p => s"${p.key.name}:${p.value}").toList.sorted.mkString(";")
-    s".$className{$body}"
+  def cssProperties2String(className: String, properties: Iterable[CssProperty | SelectorProperty]): String = {
+    val body         = properties
+      .collect { case p: CssProperty => p }
+      .map(p => s"${p.key.name}:${p.value}")
+      .toList
+      .sorted
+      .mkString(";")
+    val selectorBody = properties
+      .collect { case p: SelectorProperty => p }
+      .toList
+      .sortBy(_.selector.toString)
+      .map(p => cssProperties2String(className + ":" + p.selector.toString.substring(1), p.value))
+      .map(v => "\n" + v)
+      .mkString("")
+    s".$className{$body}$selectorBody"
   }
 
   def addStyleSheet(css: String) = {

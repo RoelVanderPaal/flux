@@ -47,16 +47,29 @@ package object web {
   trait CssName(val name: String) {
     def :=(value: String) = CssProperty(this, value)
   }
+  case class SelectorProperty(selector: PseudoClass, value: Iterable[CssProperty])
+
+  trait PseudoClass {
+    def :=(value: Iterable[CssProperty]) = SelectorProperty(this, value)
+  }
 
   case object div    extends ElementModelFactory[ElementScope | HTMLElementScope]("div")
   case object h1     extends ElementModelFactory[ElementScope | HTMLElementScope]("h1")
   case object button extends ElementModelFactory[ElementScope | HTMLElementScope | HTMLButtonElementScope]("button")
 
   case object disabled   extends WritableName[Boolean, HTMLButtonElementScope]
-  case object classStyle extends WritableName[Iterable[CssProperty], HTMLElementScope]
+  case object classStyle extends WritableName[Iterable[CssProperty | SelectorProperty], HTMLElementScope]
 
   case object onclick extends EventName[MouseEvent, HTMLElementScope]
 
   case object backgroundColor extends CssName("background-color")
+
+  case object _focus extends PseudoClass
+
+  case object _disabled extends PseudoClass
+
+  case object _hover extends PseudoClass
+
+  case object _active extends PseudoClass
 
 }
