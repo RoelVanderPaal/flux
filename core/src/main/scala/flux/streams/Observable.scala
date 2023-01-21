@@ -1,7 +1,7 @@
 package flux.streams
 
 import flux.streams.constructor.{FutureObservable, Interval, IterableObservable, PeriodicObservable}
-import flux.streams.operators.{DropOperator, FilterOperator, FoldOperator, MapOperator}
+import flux.streams.operators.*
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
@@ -10,16 +10,19 @@ trait Observable[+T] {
   def subscribe[S >: T](subscriber: Subscriber[S]): Unit
   def unsubscribe[S >: T](subscriber: Subscriber[S]): Unit
 
-  def filter(f: T => Boolean): Observable[T]       = FilterOperator(this, f)
-  def map[U](f: T => U): Observable[U]             = MapOperator(this, f)
-  def fold[U](z: U)(f: (U, T) => U): Observable[U] = FoldOperator(this, z, f)
-  def drop(n: Int): Observable[T]                  = DropOperator(this, n)
+  def filter(f: T => Boolean): Observable[T]            = FilterOperator(this, f)
+  def map[U](f: T => U): Observable[U]                  = MapOperator(this, f)
+  def fold[U](z: U)(f: (U, T) => U): Observable[U]      = FoldOperator(this, z, f)
+  def drop(n: Int): Observable[T]                       = DropOperator(this, n)
+  def merge[T2](o2: Observable[T2]): Observable[T | T2] = MergeOperator(this, o2)
 }
 
 object Observable {
-  def from[T](t: T*): Observable[T]                                            = from(t)
-  def from[T](t: Iterable[T]): Observable[T]                                   = IterableObservable(t)
-  def from[T](f: Future[T])(implicit ec: ExecutionContext): Observable[Try[T]] = FutureObservable(f)
-  def periodic[T](interval: Interval)(i: Iterator[T]): Observable[T]           = PeriodicObservable(interval, i)
-  def periodic(interval: Interval): Observable[Int]                            = PeriodicObservable(interval, Iterator.from(0))
+  def from[T](t: T*): Observable[T]                                              = from(t)
+  def from[T](t: Iterable[T]): Observable[T]                                     = IterableObservable(t)
+  def from[T](f: Future[T])(implicit ec: ExecutionContext): Observable[Try[T]]   = FutureObservable(f)
+  def periodic[T](interval: Interval)(i: Iterator[T]): Observable[T]             = PeriodicObservable(interval, i)
+  def periodic(interval: Interval): Observable[Int]                              = PeriodicObservable(interval, Iterator.from(0))
+  def merge[T1, T2](o1: Observable[T1], o2: Observable[T2]): Observable[T1 | T2] = MergeOperator(o1, o2)
+  def merge[T](observables: Observable[T]*): Observable[T]                       = MergeAllOperator(observables)
 }
