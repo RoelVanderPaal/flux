@@ -7,80 +7,22 @@ import scala.annotation.nowarn
 
 object Renderer {
   var classNames = Set.empty[String]
+  case class Result(node: () => Node)
 
   def render(parent: Element, nodeModel: ElementChild, currentNode: Option[Node] = None): Option[Node] = {
-    def replaceOrAppendChild(node: Node, existing: Option[Node], parent: Element = parent): Option[Node] = {
-      existing match {
-        case Some(e) => parent.replaceChild(node, e)
-        case None    => parent.appendChild(node)
-      }
-      Some(node)
-    }
-    def handleProperty[Value](element: Element)(p: Property[Value, _])                                   = {
-      def setAttribute[Value](key: Name[_, _], value: Value) = value match {
-        case ps: Iterable[CssProperty | SelectorProperty] =>
-          val className = s"flux-${ps.map(_.toString).hashCode()}"
-          if (!classNames.contains(className)) {
-            classNames += className
-            addStyleSheet(cssProperties2String(className, ps))
-          }
-          element.setAttribute("class", className)
-        case _                                            =>
-          value match {
-            case b: Boolean => if (b) Some("") else None
-            case v          => Some(v.toString)
-          } match {
-            case Some(s) => element.setAttribute(key.name, s)
-            case None    => element.removeAttribute(key.name)
-          }
-
-      }
-      p match {
-        case SubscriberProperty(key, subscriber: Subscriber[Value]) =>
-          val o = new AbstractObservable[Value] {
-            val listener                 = (e: Value) => subscribers.foreach(_.onNext(e))
-            override def onStart(): Unit = element.addEventListener[Value](key.name, listener)
-
-            override def onStop(): Unit = element.removeEventListener[Value](key.name, listener)
-          }
-          o.subscribe(subscriber)
-        case SimpleProperty(key, value: Value)                      => setAttribute(key, value)
-        case ObservableProperty(key, o: Observable[Value])          =>
-          o.subscribe(new Subscriber[Value] {
-            override def onNext(t: Value): Unit = setAttribute(key, t)
-            override def onCompleted: Unit      = {}
-          })
-      }
-    }
-
     nodeModel match {
       case ElementModel(name, properties, children) =>
         val element = document.createElement(name)
-        parent.appendChild(element)
+        replaceOrAppendChild(element, currentNode, parent)
         properties.foreach(handleProperty(element))
-        children.foreach {
-          case n: NodeModel             => render(element, n)
-          case o: Observable[NodeModel] =>
-            o.subscribe(new Subscriber[NodeModel] {
-              var currentNode = replaceOrAppendChild(document.createComment("placeholder for stream"), None, element)
-
-              override def onNext(t: NodeModel): Unit = {
-                currentNode = render(element, t, currentNode)
-              }
-
-              override def onCompleted: Unit = {}
-            })
-        }
+        children.foreach(render(element, _))
         Some(element)
       case o: Observable[NodeModel]                 =>
-        var currentNode = replaceOrAppendChild(document.createComment("placeholder for stream"), None)
+        var currentNode = replaceOrAppendChild(document.createComment("placeholder for stream"), None, parent)
+        println("subscribe " + nodeModel)
         o.subscribe(new Subscriber[NodeModel] {
-
-          override def onNext(t: NodeModel): Unit = {
-            currentNode = render(parent, t, currentNode)
-          }
-
-          override def onCompleted: Unit = {}
+          override def onNext(t: NodeModel): Unit = currentNode = render(parent, t, currentNode)
+          override def onCompleted: Unit          = {}
         })
         None
       case text: Any                                =>
@@ -88,14 +30,53 @@ object Renderer {
           case Some(currentText: Text) =>
             currentText.data = text.toString
             currentNode
-          case existing                => replaceOrAppendChild(document.createTextNode(text.toString), existing)
+          case nonText                 => replaceOrAppendChild(document.createTextNode(text.toString), nonText, parent)
         }
-
     }
 
   }
 
-  def cssProperties2String(className: String, properties: Iterable[CssProperty | SelectorProperty]): String = {
+  private def handleProperty[Value](element: Element)(p: Property[Value, _]) = {
+    def setAttribute[Value](key: Name[_, _], value: Value) = value match {
+      case ps: Iterable[CssProperty | SelectorProperty] =>
+        val className = s"flux-${ps.map(_.toString).hashCode()}"
+        if (!classNames.contains(className)) {
+          classNames += className
+          addStyleSheet(cssProperties2String(className, ps))
+        }
+        element.setAttribute("class", className)
+      case _                                            =>
+        value match {
+          case b: Boolean => if (b) Some("") else None
+          case v          => Some(v.toString)
+        } match {
+          case Some(s) => element.setAttribute(key.name, s)
+          case None    => element.removeAttribute(key.name)
+        }
+
+    }
+
+    p match {
+      case SubscriberProperty(key, subscriber: Subscriber[Value]) => Observable.fromEventListener(element, key.name).subscribe(subscriber)
+      case SimpleProperty(key, value: Value)                      => setAttribute(key, value)
+      case ObservableProperty(key, o: Observable[Value])          =>
+        o.subscribe(new Subscriber[Value] {
+          override def onNext(t: Value): Unit = setAttribute(key, t)
+
+          override def onCompleted: Unit = {}
+        })
+    }
+  }
+
+  private def replaceOrAppendChild(node: Node, existing: Option[Node], parent: Element): Option[Node] = {
+    existing match {
+      case Some(e) => parent.replaceChild(node, e)
+      case None    => parent.appendChild(node)
+    }
+    Some(node)
+  }
+
+  private def cssProperties2String(className: String, properties: Iterable[CssProperty | SelectorProperty]): String = {
     val body         = properties
       .collect { case p: CssProperty => p }
       .map(p => s"${p.key.name}:${p.value}")
@@ -112,7 +93,7 @@ object Renderer {
     s".$className{$body}$selectorBody"
   }
 
-  def addStyleSheet(css: String) = {
+  private def addStyleSheet(css: String) = {
     val styleSheet = document.createElement("style")
     styleSheet.textContent = css
     document.head.appendChild(styleSheet)

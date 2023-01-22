@@ -8,3 +8,7 @@
 - nested observables
 - smart css properties
 - smart diffing
+
+checklist:
+- private where possible?
+- unsafe implemented everywhere?

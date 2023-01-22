@@ -57,7 +57,7 @@ package object web {
   }
 
   trait ElementModelFactory[Scope](name: String) {
-//    def apply(children: ElementChild*): ElementModel = ElementModel(name, List.empty[Property[_, Scope]], children)
+    def apply(children: ElementChild*): ElementModel = ElementModel(name, List.empty[Property[_, Scope]], children)
 
     def apply(properties: Property[_, Scope]*) = new ElementModelFactoryWithoutChildren(name, properties)
   }
