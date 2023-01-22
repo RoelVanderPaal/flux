@@ -4,3 +4,7 @@
     - unsubscribe (only when different Subscriber?)
     - what about multiple levels of nested Observable?
       - should be handled, because Renderer will not come there anymore, so parent needs list of lower level subscriptions
+
+- nested observables
+- smart css properties
+- smart diffing

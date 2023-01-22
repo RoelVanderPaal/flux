@@ -5,7 +5,7 @@ import org.scalajs.dom.{document, Event, MouseEvent}
 case class Button(label: String) {
   val clicks = Subject[MouseEvent]()
   val value  = classStyle := Set(_hover := Set(backgroundColor := "green"))
-  val view   = button(onclick := clicks, value, disabled := false)(label)
+  val view   = button(Property.unsafeSubscriber("click", clicks), value, disabled := false)(label)
 }
 object Main extends App {
   val ticker = {
@@ -28,7 +28,15 @@ object Main extends App {
       )
       .fold(0)(_ + _)
 
-    div(classStyle := List(backgroundColor := "red"))(bminus.view, counter, bplus.view, bplus10.view, disableButton.view, dButton)
+    div(classStyle := List(backgroundColor := "orange"))(
+      bminus.view,
+      counter,
+      bplus.view,
+      bplus10.view,
+      disableButton.view,
+      dButton,
+      ElementModel.unsafe("h2", List(classStyle := List(backgroundColor := "green", CssProperty.unsafe("color", "white"))), "h2 test")
+    )
 //    o
   }
 

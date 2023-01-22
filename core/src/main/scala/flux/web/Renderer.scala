@@ -17,7 +17,7 @@ object Renderer {
       Some(node)
     }
     def handleProperty[Value](element: Element)(p: Property[Value, _])                                   = {
-      def setAttribute[Value](key: WritableName[_, _], value: Value) = value match {
+      def setAttribute[Value](key: Name[_, _], value: Value) = value match {
         case ps: Iterable[CssProperty | SelectorProperty] =>
           val className = s"flux-${ps.map(_.toString).hashCode()}"
           if (!classNames.contains(className)) {
@@ -30,20 +30,18 @@ object Renderer {
             case b: Boolean => if (b) Some("") else None
             case v          => Some(v.toString)
           } match {
-            case Some(s) => element.setAttribute(key.toString, s)
-            case None    => element.removeAttribute(key.toString)
+            case Some(s) => element.setAttribute(key.name, s)
+            case None    => element.removeAttribute(key.name)
           }
 
       }
       p match {
         case SubscriberProperty(key, subscriber: Subscriber[Value]) =>
           val o = new AbstractObservable[Value] {
-            val listener = (e: Value) => subscribers.foreach(_.onNext(e))
-            val `type`   = key.toString.stripPrefix("on")
+            val listener                 = (e: Value) => subscribers.foreach(_.onNext(e))
+            override def onStart(): Unit = element.addEventListener[Value](key.name, listener)
 
-            override def onStart(): Unit = element.addEventListener[Value](`type`, listener)
-
-            override def onStop(): Unit = element.removeEventListener[Value](`type`, listener)
+            override def onStop(): Unit = element.removeEventListener[Value](key.name, listener)
           }
           o.subscribe(subscriber)
         case SimpleProperty(key, value: Value)                      => setAttribute(key, value)

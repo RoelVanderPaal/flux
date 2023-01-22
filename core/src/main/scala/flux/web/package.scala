@@ -6,34 +6,53 @@ package object web {
   type NodeModel    = Any | ElementModel
   type ElementChild = NodeModel | Observable[NodeModel]
 
-  trait Scope
-  trait ElementScope           extends Scope
-  trait HTMLElementScope       extends Scope
-  trait HTMLButtonElementScope extends Scope
+  private trait Scope
+  private trait ElementScope           extends Scope
+  private trait HTMLElementScope       extends Scope
+  private trait HTMLButtonElementScope extends Scope
 
-  sealed trait Property[Value, +Scope] {
+  sealed private trait Property[Value, +Scope] {
     def key: Name[Value, Scope]
   }
-  case class SimpleProperty[Value, Scope](key: WritableName[Value, Scope], value: Value)                 extends Property[Value, Scope]
-  case class ObservableProperty[Value, Scope](key: WritableName[Value, Scope], value: Observable[Value]) extends Property[Value, Scope]
-  case class SubscriberProperty[Value <: Event, Scope](key: EventName[Value, Scope], value: Subscriber[Value])
+  object Property                              {
+    def unsafe[Value](key: String, v: Value)                       = SimpleProperty(createName(key), v)
+    def unsafeObservable[Value](key: String, v: Observable[Value]) = ObservableProperty(createName(key), v)
+    def unsafeSubscriber[Value](key: String, v: Subscriber[Value]) = SubscriberProperty(createName(key), v)
+
+    private def createName[Value](key: String) = {
+      new Name[Value, ElementScope] {
+        override def name: String = key
+      }
+    }
+  }
+  private case class SimpleProperty[Value, Scope](key: Name[Value, Scope], value: Value) extends Property[Value, Scope]
+  private case class ObservableProperty[Value, Scope](key: Name[Value, Scope], value: Observable[Value]) extends Property[Value, Scope]
+  private case class SubscriberProperty[Value <: Event, Scope](key: Name[Value, Scope], value: Subscriber[Value])
       extends Property[Value, Scope]
 
-  sealed trait Name[Value, +Scope]
+  sealed private trait Name[Value, +Scope] {
+    def name: String
+  }
 
-  trait WritableName[Value, Scope] extends Name[Value, Scope] {
+  private trait WritableName[Value, Scope] extends Name[Value, Scope] {
     def :=(value: Value)             = SimpleProperty[Value, Scope](this, value)
     def :=(value: Observable[Value]) = ObservableProperty[Value, Scope](this, value)
 
+    override def name: String = this.toString
   }
 
-  trait EventName[Value <: Event, Scope] extends Name[Value, Scope] {
+  private trait EventName[Value <: Event, Scope] extends Name[Value, Scope] {
     def :=(value: Subscriber[Value]) = SubscriberProperty(this, value)
+
+    override def name: String = this.toString.stripPrefix("on")
   }
 
-  case class ElementModel(name: String, properties: Seq[Property[_, _]], children: Seq[ElementChild])
+  private case class ElementModel(name: String, properties: Seq[Property[_, _]], children: Seq[ElementChild])
+  object ElementModel {
+    def unsafe(name: String, properties: Seq[Property[_, _]], children: Seq[ElementChild]) = ElementModel(name, properties, children)
+  }
 
-  class ElementModelFactoryWithoutChildren(name: String, properties: Seq[Property[_, _]]) {
+  private class ElementModelFactoryWithoutChildren(name: String, properties: Seq[Property[_, _]]) {
     def apply(children: ElementChild*): ElementModel = ElementModel(name, properties, children)
   }
 
@@ -43,11 +62,14 @@ package object web {
     def apply(properties: Property[_, Scope]*) = new ElementModelFactoryWithoutChildren(name, properties)
   }
 
-  case class CssProperty(key: CssName, value: String)
-  trait CssName(val name: String) {
+  private case class CssProperty(key: CssName, value: String)
+  object CssProperty                      {
+    def unsafe(key: String, value: String) = CssProperty(new CssName(key) {}, value)
+  }
+  private trait CssName(val name: String) {
     def :=(value: String) = CssProperty(this, value)
   }
-  case class SelectorProperty(selector: PseudoClass, value: Iterable[CssProperty])
+  private case class SelectorProperty(selector: PseudoClass, value: Iterable[CssProperty])
 
   trait PseudoClass {
     def :=(value: Iterable[CssProperty]) = SelectorProperty(this, value)
