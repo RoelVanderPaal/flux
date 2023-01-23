@@ -14,45 +14,48 @@ case class Display(label: String, o: Observable[Int]) {
     o
   )
 }
+
+case class Counter() {
+  val bplus  = Button("plus")
+  val bminus = Button("minus")
+
+  val actions = Observable
+    .merge(
+      bplus.clicks.map(_ => 1),
+      bminus.clicks.map(_ => -1)
+    )
+  val counter = actions
+    .fold(0)(_ + _)
+    .remember()
+
+  val view = div(bplus.view, bminus.view, counter)
+}
+
+val unsafe = ElementModel.unsafe(
+  "h2",
+  List(classStyle := List(backgroundColor := "green", CssProperty.unsafe("color", "white"))),
+  List("h2 test2")
+)
+
 object Main extends App {
   val ticker = {
-    val o = Observable.periodic(1000)
+    val o = Observable.periodic(1000).remember()
 
-    val disabledSubject = Subject[MouseEvent]()
-
-    val bplus         = Button("plus")
-    val bplus10       = Button("plus 10")
-    val bminus        = Button("minus")
     val disableButton = Button("disable")
+    val chooser       = disableButton.clicks.map(_ => 1).fold(0)(_ + _).map(_ % 2 == 0).remember()
 
-    val chooser = disableButton.clicks.map(_ => 1).fold(0)(_ + _).map(_ % 2 == 0)
-    val dButton = button(disabled := chooser)("disabled?")
+    val tab1          = Button("tab1")
+    val tab2          = Button("tab2")
+    val tabObservable = Observable.merge(tab1.clicks.map(_ => "tab1"), tab2.clicks.map(_ => "tab2"))
 
-    val actions = Observable
-      .merge(
-        bplus.clicks.map(_ => 1),
-        bplus10.clicks.map(_ => 10),
-        bminus.clicks.map(_ => -1)
-      )
-    val counter = actions
-      .fold(0)(_ + _)
-      .remember()
-
-    div(classStyle := List(backgroundColor := "orange"))(
-      bminus.view,
-//      counter,
-      bplus.view,
-//      bplus10.view,
-//      ElementModel.unsafe(
-//        "h2",
-//        List(classStyle := List(backgroundColor := "green", CssProperty.unsafe("color", "white"))),
-//        List("h2 test2")
-//      ),
+    val nested  = div(classStyle := List(backgroundColor := "orange"))(
+      button(disabled := chooser)("disabled?"),
       disableButton.view,
-//      dButton,
-      div()(chooser.map(v => if (v) counter else h1("false")))
+      div()(chooser.map(v => if (v) o else "false"))
     )
-//    div()(o)
+    val counter = Counter()
+
+    div(tab1.view, tab2.view, tabObservable.map(t => if (t == "tab1") nested else "tab2"))
   }
 
   Renderer.render(document.body, ticker)

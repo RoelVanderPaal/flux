@@ -8,6 +8,7 @@
 - nested observables
 - smart css properties
 - smart diffing
+- should Observables remember by default? or only fold?
 
 checklist:
 - private where possible?

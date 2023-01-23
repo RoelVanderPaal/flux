@@ -1,39 +1,86 @@
 package flux.web
 import flux.streams.constructor.AbstractObservable
-import flux.streams.{Observable, Subscriber}
+import flux.streams.{Observable, Subscriber, Subscription}
 import org.scalajs.dom.*
 
 import scala.annotation.nowarn
 
 object Renderer {
   var classNames = Set.empty[String]
-  case class Result(node: () => Node)
+  case class Result(nodeHolder: NodeHolder, subscriptionsHolder: SubscriptionsHolder) {
+    def node          = nodeHolder.node
+    def subscriptions = subscriptionsHolder.subscriptions
+  }
+  case class NodeHolder()                                                             {
+    var node: Node = _
+  }
+  object NodeHolder                                                                   {
+    def apply(node: Node): NodeHolder = {
+      val holder = NodeHolder()
+      holder.node = node
+      holder
+    }
+  }
+  case class SubscriptionsHolder()                                                    {
+    var subscriptions: Iterable[Subscription] = _
+  }
+  object SubscriptionsHolder                                                          {
+    def empty: SubscriptionsHolder                                        = create(Iterable.empty[Subscription])
+    def apply(subscription: Subscription): SubscriptionsHolder            = create(Iterable(subscription))
+    def apply(subscriptions: Iterable[Subscription]): SubscriptionsHolder = create(subscriptions)
 
-  def render(parent: Element, nodeModel: ElementChild, currentNode: Option[Node] = None): Option[Node] = {
+    private def create(subscriptions: Iterable[Subscription]): SubscriptionsHolder = {
+      val holder = SubscriptionsHolder()
+      holder.subscriptions = subscriptions
+      holder
+    }
+  }
+
+  def render(parent: Element, nodeModel: ElementChild, result: Option[Result] = None): Result = {
     nodeModel match {
       case ElementModel(name, properties, children) =>
-        val element = document.createElement(name)
-        replaceOrAppendChild(element, currentNode, parent)
+        val element       = document.createElement(name)
+        replaceOrAppendChild(element, result.map(_.node), parent)
         properties.foreach(handleProperty(element))
-        children.foreach(render(element, _))
-        Some(element)
+        val subscriptions = children.map(render(element, _)).flatMap(_.subscriptions).toSet
+        Result(NodeHolder(element), SubscriptionsHolder(subscriptions))
       case o: Observable[NodeModel]                 =>
-        var currentNode = replaceOrAppendChild(document.createComment("placeholder for stream"), None, parent)
-        println("subscribe " + nodeModel)
-        o.subscribe(new Subscriber[NodeModel] {
-          override def onNext(t: NodeModel): Unit = currentNode = render(parent, t, currentNode)
-          override def onCompleted: Unit          = {}
+        val nodeHolder                = result.map(_.nodeHolder).getOrElse {
+          val comment = document.createComment("placeholder for stream")
+          replaceOrAppendChild(comment, None, parent)
+          NodeHolder(comment)
+        }
+        val parentSubscriptionsHolder = SubscriptionsHolder.empty
+        val subscription              = o.subscribe(new Subscriber[NodeModel] {
+          val r                                   = Result(
+            nodeHolder,
+            SubscriptionsHolder.empty
+          )
+          override def onNext(t: NodeModel): Unit = {
+            r.subscriptions.foreach(_.unsubscribe())
+            val renderResult = render(parent, t, Some(r))
+            r.nodeHolder.node = renderResult.nodeHolder.node
+            r.subscriptionsHolder.subscriptions = renderResult.subscriptionsHolder.subscriptions
+            parentSubscriptionsHolder.subscriptions =
+              parentSubscriptionsHolder.subscriptions ++ renderResult.subscriptionsHolder.subscriptions
+          }
+
+          override def onCompleted: Unit = {}
         })
-        None
+        parentSubscriptionsHolder.subscriptions = parentSubscriptionsHolder.subscriptions ++ Iterable(subscription)
+        Result(nodeHolder, parentSubscriptionsHolder)
       case text: Any                                =>
-        currentNode match {
+        val n = result.map(_.node) match {
           case Some(currentText: Text) =>
             currentText.data = text.toString
-            currentNode
-          case nonText                 => replaceOrAppendChild(document.createTextNode(text.toString), nonText, parent)
+            currentText
+          case nonText                 =>
+            val text1 = document.createTextNode(text.toString)
+            replaceOrAppendChild(text1, nonText, parent)
+            text1
         }
+        Result(NodeHolder(n), SubscriptionsHolder.empty)
     }
-
   }
 
   private def handleProperty[Value](element: Element)(p: Property[Value, _]) = {
@@ -68,12 +115,11 @@ object Renderer {
     }
   }
 
-  private def replaceOrAppendChild(node: Node, existing: Option[Node], parent: Element): Option[Node] = {
+  private def replaceOrAppendChild(node: Node, existing: Option[Node], parent: Element): Unit = {
     existing match {
       case Some(e) => parent.replaceChild(node, e)
       case None    => parent.appendChild(node)
     }
-    Some(node)
   }
 
   private def cssProperties2String(className: String, properties: Iterable[CssProperty | SelectorProperty]): String = {
