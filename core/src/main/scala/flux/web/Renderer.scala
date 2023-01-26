@@ -36,7 +36,12 @@ object Renderer {
     }
   }
 
-  def render(parent: Element, nodeModel: ElementChild, result: Option[Result] = None): Result = {
+  def render(
+    parent: Element,
+    nodeModel: ElementChild,
+    result: Option[Result] = None,
+    previousNodeModel: Option[ElementChild] = None
+  ): Result = {
     nodeModel match {
       case ElementModel(name, properties, children) =>
         val element               = document.createElement(name)

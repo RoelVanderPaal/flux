@@ -42,11 +42,11 @@ object Main extends App {
     val o = Observable.periodic(1000).remember()
 
     val disableButton = Button("disable")
-    val chooser       = disableButton.clicks.map(_ => 1).fold(0)(_ + _).map(_ % 2 == 0).remember()
+    val chooser       = disableButton.clicks.mapTo(1).fold(0)(_ + _).map(_ % 2 == 0).remember()
 
     val tab1          = Button("tab1")
     val tab2          = Button("tab2")
-    val tabObservable = Observable.merge(tab1.clicks.map(_ => "tab1"), tab2.clicks.map(_ => "tab2"))
+    val tabObservable = Observable.merge(tab1.clicks.mapTo("tab1"), tab2.clicks.mapTo("tab2")).startWith("tab1")
 
     val nested = div(classStyle := List(backgroundColor := "orange"))(
       button(disabled := chooser)("disabled?"),
