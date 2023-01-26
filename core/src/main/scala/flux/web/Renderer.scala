@@ -39,15 +39,15 @@ object Renderer {
   def render(
     parent: Element,
     nodeModel: ElementChild,
-    result: Option[Result] = None,
-    previousNodeModel: Option[ElementChild] = None
+    previousNodeModel: Option[ElementChild] = None,
+    result: Option[Result] = None
   ): Result = {
     nodeModel match {
       case ElementModel(name, properties, children) =>
         val element               = document.createElement(name)
         replaceOrAppendChild(element, result.map(_.node), parent)
         val propertySubscriptions = properties.flatMap(handleProperty(element))
-        val childSubscriptions    = children.map(render(element, _)).flatMap(_.subscriptions)
+        val childSubscriptions    = children.map((nodeModel: ElementChild) => render(element, nodeModel)).flatMap(_.subscriptions)
         Result(NodeHolder(element), SubscriptionsHolder(childSubscriptions ++ propertySubscriptions))
       case o: Observable[NodeModel]                 =>
         val nodeHolder                = result.map(_.nodeHolder).getOrElse {
@@ -64,7 +64,7 @@ object Renderer {
           override def onNext(t: NodeModel): Unit = {
             r.subscriptions.foreach(_.unsubscribe())
             parentSubscriptionsHolder.subscriptions = parentSubscriptionsHolder.subscriptions.filterNot(r.subscriptions.toList.contains)
-            val renderResult = render(parent, t, Some(r))
+            val renderResult = render(parent, t, result = Some(r))
             r.nodeHolder.node = renderResult.nodeHolder.node
             r.subscriptionsHolder.subscriptions = renderResult.subscriptionsHolder.subscriptions
             parentSubscriptionsHolder.subscriptions ++= renderResult.subscriptionsHolder.subscriptions

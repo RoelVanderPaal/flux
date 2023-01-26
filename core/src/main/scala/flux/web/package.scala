@@ -3,6 +3,7 @@ import flux.streams.{Observable, Subscriber}
 import org.scalajs.dom.{Event, MouseEvent}
 
 package object web {
+
   type NodeModel    = Any | ElementModel
   type ElementChild = NodeModel | Observable[NodeModel]
 
