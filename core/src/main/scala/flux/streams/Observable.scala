@@ -10,6 +10,7 @@ import scala.util.Try
 trait Observable[+T] {
   def subscribe[S >: T](subscriber: Subscriber[S]): Subscription
   def unsubscribe[S >: T](subscriber: Subscriber[S]): Unit
+  def debug: String
 
   def filter(f: T => Boolean): Observable[T]            = FilterOperator(this, f)
   def map[U](f: T => U): Observable[U]                  = MapOperator(this, f)

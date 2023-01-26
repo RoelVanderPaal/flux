@@ -39,11 +39,11 @@ object Renderer {
   def render(parent: Element, nodeModel: ElementChild, result: Option[Result] = None): Result = {
     nodeModel match {
       case ElementModel(name, properties, children) =>
-        val element       = document.createElement(name)
+        val element               = document.createElement(name)
         replaceOrAppendChild(element, result.map(_.node), parent)
-        properties.foreach(handleProperty(element))
-        val subscriptions = children.map(render(element, _)).flatMap(_.subscriptions).toSet
-        Result(NodeHolder(element), SubscriptionsHolder(subscriptions))
+        val propertySubscriptions = properties.flatMap(handleProperty(element))
+        val childSubscriptions    = children.map(render(element, _)).flatMap(_.subscriptions)
+        Result(NodeHolder(element), SubscriptionsHolder(childSubscriptions ++ propertySubscriptions))
       case o: Observable[NodeModel]                 =>
         val nodeHolder                = result.map(_.nodeHolder).getOrElse {
           val comment = document.createComment("placeholder for stream")
@@ -58,11 +58,11 @@ object Renderer {
           )
           override def onNext(t: NodeModel): Unit = {
             r.subscriptions.foreach(_.unsubscribe())
+            parentSubscriptionsHolder.subscriptions = parentSubscriptionsHolder.subscriptions.filterNot(r.subscriptions.toList.contains)
             val renderResult = render(parent, t, Some(r))
             r.nodeHolder.node = renderResult.nodeHolder.node
             r.subscriptionsHolder.subscriptions = renderResult.subscriptionsHolder.subscriptions
-            parentSubscriptionsHolder.subscriptions =
-              parentSubscriptionsHolder.subscriptions ++ renderResult.subscriptionsHolder.subscriptions
+            parentSubscriptionsHolder.subscriptions ++= renderResult.subscriptionsHolder.subscriptions
           }
 
           override def onCompleted: Unit = {}
@@ -83,7 +83,7 @@ object Renderer {
     }
   }
 
-  private def handleProperty[Value](element: Element)(p: Property[Value, _]) = {
+  private def handleProperty[Value](element: Element)(p: Property[Value, _]): Option[Subscription] = {
     def setAttribute[Value](key: Name[_, _], value: Value) = value match {
       case ps: Iterable[CssProperty | SelectorProperty] =>
         val className = s"flux-${ps.map(_.toString).hashCode()}"
@@ -104,14 +104,18 @@ object Renderer {
     }
 
     p match {
-      case SubscriberProperty(key, subscriber: Subscriber[Value]) => Observable.fromEventListener(element, key.name).subscribe(subscriber)
-      case SimpleProperty(key, value: Value)                      => setAttribute(key, value)
+      case SubscriberProperty(key, subscriber: Subscriber[Value]) =>
+        Observable.fromEventListener(element, key.name).subscribe(subscriber)
+        None
+      case SimpleProperty(key, value: Value)                      =>
+        setAttribute(key, value)
+        None
       case ObservableProperty(key, o: Observable[Value])          =>
-        o.subscribe(new Subscriber[Value] {
+        Some(o.subscribe(new Subscriber[Value] {
           override def onNext(t: Value): Unit = setAttribute(key, t)
 
           override def onCompleted: Unit = {}
-        })
+        }))
     }
   }
 

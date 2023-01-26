@@ -47,12 +47,12 @@ package object web {
     override def name: String = this.toString.stripPrefix("on")
   }
 
-  private case class ElementModel(name: String, properties: Seq[Property[_, _]], children: Seq[ElementChild])
+  private case class ElementModel(name: String, properties: Iterable[Property[_, _]], children: Iterable[ElementChild])
   object ElementModel {
-    def unsafe(name: String, properties: Seq[Property[_, _]], children: Seq[ElementChild]) = ElementModel(name, properties, children)
+    def unsafe(name: String, properties: Seq[Property[_, _]], children: Iterable[ElementChild]) = ElementModel(name, properties, children)
   }
 
-  private class ElementModelFactoryWithoutChildren(name: String, properties: Seq[Property[_, _]]) {
+  private class ElementModelFactoryWithoutChildren(name: String, properties: Iterable[Property[_, _]]) {
     def apply(children: ElementChild*): ElementModel = ElementModel(name, properties, children)
   }
 

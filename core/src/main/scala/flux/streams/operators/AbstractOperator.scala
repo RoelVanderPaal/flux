@@ -22,4 +22,17 @@ abstract class AbstractOperator[T, U](o: Observable[T]) extends AbstractObservab
     parentSubscriber.foreach(o.unsubscribe)
     parentSubscriber = None
   }
+
+  def parents: Iterable[Observable[_]] = Iterable(o)
+
+  def debugInternal: Iterable[String] =
+    Iterable(super.debug) ++ parents
+      .flatMap {
+        case ao: AbstractOperator[_, _] => ao.debugInternal
+        case o                          => List(o.debug)
+      }
+      .map(v => s"\t$v")
+
+  override def debug: String = debugInternal.mkString(System.lineSeparator())
+
 }

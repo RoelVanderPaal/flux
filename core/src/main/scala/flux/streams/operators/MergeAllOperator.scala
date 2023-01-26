@@ -20,4 +20,6 @@ case class MergeAllOperator[T](observables: Iterable[Observable[T]]) extends Abs
     parentSubscriber.foreach(s => observables.foreach(_.unsubscribe(s)))
     parentSubscriber = None
   }
+
+  def parents: Iterable[Observable[_]] = observables
 }

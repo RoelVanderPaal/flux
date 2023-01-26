@@ -21,4 +21,6 @@ abstract class AbstractObservable[T] extends Observable[T] {
       onStop()
     }
   }
+
+  override def debug: String = s"${this.toString} ==> ${subscribers.length}"
 }

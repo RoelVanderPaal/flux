@@ -48,12 +48,11 @@ object Main extends App {
     val tab2          = Button("tab2")
     val tabObservable = Observable.merge(tab1.clicks.map(_ => "tab1"), tab2.clicks.map(_ => "tab2"))
 
-    val nested  = div(classStyle := List(backgroundColor := "orange"))(
+    val nested = div(classStyle := List(backgroundColor := "orange"))(
       button(disabled := chooser)("disabled?"),
       disableButton.view,
       div()(chooser.map(v => if (v) o else "false"))
     )
-    val counter = Counter()
 
     div(tab1.view, tab2.view, tabObservable.map(t => if (t == "tab1") nested else "tab2"))
   }

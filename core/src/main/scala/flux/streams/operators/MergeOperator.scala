@@ -22,4 +22,7 @@ case class MergeOperator[T1, T2](o1: Observable[T1], o2: Observable[T2]) extends
     parentSubscriber.foreach(o2.unsubscribe)
     parentSubscriber = None
   }
+
+  def parents: Iterable[Observable[_]] = Iterable(o1, o2)
+
 }
