@@ -15,6 +15,7 @@ trait Observable[+T] {
   def filter(f: T => Boolean): Observable[T]            = FilterOperator(this, f)
   def map[U](f: T => U): Observable[U]                  = MapOperator(this, f)
   def mapTo[U](to: U): Observable[U]                    = MapOperator(this, _ => to)
+  def text(): Observable[String]                        = MapOperator(this, _.toString)
   def fold[U](z: U)(f: (U, T) => U): Observable[U]      = FoldOperator(this, z, f)
   def drop(n: Int): Observable[T]                       = DropOperator(this, n)
   def merge[T2](o2: Observable[T2]): Observable[T | T2] = MergeOperator(this, o2)

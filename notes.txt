@@ -5,10 +5,10 @@
     - what about multiple levels of nested Observable?
       - should be handled, because Renderer will not come there anymore, so parent needs list of lower level subscriptions
 
-- nested observables
+x nested observables
 - smart css properties
 - smart diffing
-- should Observables remember by default? or only fold?
+- should Observables remember by default? or only fold? MemorySubject?
 
 checklist:
 - private where possible?

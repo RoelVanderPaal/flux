@@ -37,7 +37,7 @@ object Renderer {
   }
 
   def render(
-    parent: Element,
+    parent: Node,
     nodeModel: ElementChild,
     previousNodeModel: Option[ElementChild] = None,
     result: Option[Result] = None
@@ -57,6 +57,7 @@ object Renderer {
         }
         val parentSubscriptionsHolder = SubscriptionsHolder.empty
         val subscription              = o.subscribe(new Subscriber[NodeModel] {
+          var latest                              = Option.empty[NodeModel]
           val r                                   = Result(
             nodeHolder,
             SubscriptionsHolder.empty
@@ -64,7 +65,8 @@ object Renderer {
           override def onNext(t: NodeModel): Unit = {
             r.subscriptions.foreach(_.unsubscribe())
             parentSubscriptionsHolder.subscriptions = parentSubscriptionsHolder.subscriptions.filterNot(r.subscriptions.toList.contains)
-            val renderResult = render(parent, t, result = Some(r))
+            val renderResult = render(parent, t, latest, Some(r))
+            latest = Some(t)
             r.nodeHolder.node = renderResult.nodeHolder.node
             r.subscriptionsHolder.subscriptions = renderResult.subscriptionsHolder.subscriptions
             parentSubscriptionsHolder.subscriptions ++= renderResult.subscriptionsHolder.subscriptions
@@ -124,7 +126,7 @@ object Renderer {
     }
   }
 
-  private def replaceOrAppendChild(node: Node, existing: Option[Node], parent: Element): Unit = {
+  private def replaceOrAppendChild(node: Node, existing: Option[Node], parent: Node): Unit = {
     existing match {
       case Some(e) => parent.replaceChild(node, e)
       case None    => parent.appendChild(node)

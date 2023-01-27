@@ -1,10 +1,10 @@
 import flux.streams.{Observable, Subject, Subscriber}
-import flux.web.*
+import flux.web.{given, *}
 import org.scalajs.dom.{document, Event, MouseEvent}
 
 case class Button(label: String) {
   val clicks = Subject[MouseEvent]()
-  val value  = classStyle := Set(_hover := Set(backgroundColor := "green"))
+  val value  = classStyle := Set(_hover := Set(backgroundColor := "green"), CssProperty.unsafe("padding", "10px"))
   val view   = button(Property.unsafeSubscriber("click", clicks), value, disabled := false)(label)
 }
 
@@ -42,7 +42,7 @@ object Main extends App {
     val o = Observable.periodic(1000).remember()
 
     val disableButton = Button("disable")
-    val chooser       = disableButton.clicks.mapTo(1).fold(0)(_ + _).map(_ % 2 == 0).remember()
+    val chooser       = disableButton.clicks.mapTo(1).fold(0)(_ + _).startWith(0).map(_ % 2 == 0).remember()
 
     val tab1          = Button("tab1")
     val tab2          = Button("tab2")
@@ -51,10 +51,10 @@ object Main extends App {
     val nested = div(classStyle := List(backgroundColor := "orange"))(
       button(disabled := chooser)("disabled?"),
       disableButton.view,
-      div()(chooser.map(v => if (v) o else "false"))
+      div()(chooser.map(v => if (v) div(o) else "false"))
     )
 
-    div(tab1.view, tab2.view, tabObservable.map(t => if (t == "tab1") nested else "tab2"))
+    div()(tab1.view, tab2.view, tabObservable.map(t => if (t == "tab1") nested else "tab2"))
   }
 
   Renderer.render(document.body, ticker)

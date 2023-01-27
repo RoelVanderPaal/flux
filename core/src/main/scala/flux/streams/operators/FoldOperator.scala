@@ -8,9 +8,4 @@ case class FoldOperator[T, U](o: Observable[T], z: U, f: (U, T) => U) extends Ab
     accumulator = f(accumulator, t)
     subscribers.foreach(_.onNext(accumulator))
   }
-
-  override def onStart(): Unit = {
-    subscribers.foreach(_.onNext(z))
-    super.onStart()
-  }
 }

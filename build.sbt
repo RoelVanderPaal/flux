@@ -5,6 +5,7 @@ ThisBuild / scalaVersion := "3.2.2"
 lazy val core = project
   .enablePlugins(ScalaJSPlugin)
   .settings(
+    scalacOptions ++= Seq("-deprecation", "-feature", "-language:implicitConversions"),
     libraryDependencies ++= Seq(
       "org.scala-js"  %%% "scalajs-dom" % "2.3.0",
       "org.scalatest" %%% "scalatest"   % "3.2.15" % Test
@@ -14,6 +15,7 @@ lazy val core = project
 lazy val example = project
   .enablePlugins(ScalaJSPlugin)
   .settings(
-    scalaJSUseMainModuleInitializer := true
+    scalaJSUseMainModuleInitializer := true,
+    scalacOptions ++= Seq("-deprecation", "-feature", "-language:implicitConversions")
   )
   .dependsOn(core)
