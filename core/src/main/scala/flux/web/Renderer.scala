@@ -7,24 +7,27 @@ import scala.annotation.nowarn
 
 object Renderer {
   var classNames = Set.empty[String]
-  case class Result(nodeHolder: NodeHolder, subscriptionsHolder: SubscriptionsHolder) {
+  case class ReturnState(nodeHolder: NodeHolder, subscriptionsHolder: SubscriptionsHolder) {
     def node          = nodeHolder.node
     def subscriptions = subscriptionsHolder.subscriptions
   }
-  case class NodeHolder()                                                             {
+  case class PreviousState(nodeHolder: NodeHolder)                                         {
+    def node = nodeHolder.node
+  }
+  case class NodeHolder()                                                                  {
     var node: Node = _
   }
-  object NodeHolder                                                                   {
+  object NodeHolder                                                                        {
     def apply(node: Node): NodeHolder = {
       val holder = NodeHolder()
       holder.node = node
       holder
     }
   }
-  case class SubscriptionsHolder()                                                    {
+  case class SubscriptionsHolder()                                                         {
     var subscriptions: Iterable[Subscription] = _
   }
-  object SubscriptionsHolder                                                          {
+  object SubscriptionsHolder                                                               {
     def empty: SubscriptionsHolder                                        = create(Iterable.empty[Subscription])
     def apply(subscription: Subscription): SubscriptionsHolder            = create(Iterable(subscription))
     def apply(subscriptions: Iterable[Subscription]): SubscriptionsHolder = create(subscriptions)
@@ -36,21 +39,20 @@ object Renderer {
     }
   }
 
-  def render(
-    parent: Node,
-    nodeModel: ElementChild,
-    previousNodeModel: Option[ElementChild] = None,
-    result: Option[Result] = None
-  ): Result = {
-    nodeModel match {
+  def render(parent: Node, elementChild: ElementChild, previousState: Option[PreviousState] = None): ReturnState = {
+    elementChild match {
       case ElementModel(name, properties, children) =>
+//        previousElementChild match {
+//          case Some(ElementModel(previousName, _, _)) if previousName == name =>
+//          case _                                                              =>
+//        }
         val element               = document.createElement(name)
-        replaceOrAppendChild(element, result.map(_.node), parent)
+        replaceOrAppendChild(element, previousState.map(_.node), parent)
         val propertySubscriptions = properties.flatMap(handleProperty(element))
         val childSubscriptions    = children.map((nodeModel: ElementChild) => render(element, nodeModel)).flatMap(_.subscriptions)
-        Result(NodeHolder(element), SubscriptionsHolder(childSubscriptions ++ propertySubscriptions))
+        ReturnState(NodeHolder(element), SubscriptionsHolder(childSubscriptions ++ propertySubscriptions))
       case o: Observable[NodeModel]                 =>
-        val nodeHolder                = result.map(_.nodeHolder).getOrElse {
+        val nodeHolder                = previousState.map(_.nodeHolder).getOrElse {
           val comment = document.createComment("placeholder for stream")
           replaceOrAppendChild(comment, None, parent)
           NodeHolder(comment)
@@ -58,14 +60,14 @@ object Renderer {
         val parentSubscriptionsHolder = SubscriptionsHolder.empty
         val subscription              = o.subscribe(new Subscriber[NodeModel] {
           var latest                              = Option.empty[NodeModel]
-          val r                                   = Result(
+          val r                                   = ReturnState(
             nodeHolder,
             SubscriptionsHolder.empty
           )
           override def onNext(t: NodeModel): Unit = {
             r.subscriptions.foreach(_.unsubscribe())
             parentSubscriptionsHolder.subscriptions = parentSubscriptionsHolder.subscriptions.filterNot(r.subscriptions.toList.contains)
-            val renderResult = render(parent, t, latest, Some(r))
+            val renderResult = render(parent, t, Some(PreviousState(nodeHolder)))
             latest = Some(t)
             r.nodeHolder.node = renderResult.nodeHolder.node
             r.subscriptionsHolder.subscriptions = renderResult.subscriptionsHolder.subscriptions
@@ -75,9 +77,9 @@ object Renderer {
           override def onCompleted: Unit = {}
         })
         parentSubscriptionsHolder.subscriptions = parentSubscriptionsHolder.subscriptions ++ Iterable(subscription)
-        Result(nodeHolder, parentSubscriptionsHolder)
-      case text: Any                                =>
-        val n = result.map(_.node) match {
+        ReturnState(nodeHolder, parentSubscriptionsHolder)
+      case text: String                             =>
+        val n = previousState.map(_.node) match {
           case Some(currentText: Text) =>
             currentText.data = text.toString
             currentText
@@ -86,7 +88,7 @@ object Renderer {
             replaceOrAppendChild(text1, nonText, parent)
             text1
         }
-        Result(NodeHolder(n), SubscriptionsHolder.empty)
+        ReturnState(NodeHolder(n), SubscriptionsHolder.empty)
     }
   }
 

@@ -6,7 +6,9 @@ import scala.language.implicitConversions
 package object web {
 
   type NodeModel    = String | ElementModel
-  type ElementChild = NodeModel | Observable[NodeModel]
+  type ElementChild = NodeModel | Observable[NodeModel | Observable[NodeModel]]
+  private case class ElementModel(name: String, properties: Iterable[Property[_, _]], children: Iterable[ElementChild])
+
   given Conversion[Observable[Int], Observable[String]] = _.text()
 
   private trait Scope
@@ -50,7 +52,6 @@ package object web {
     override def name: String = this.toString.stripPrefix("on")
   }
 
-  private case class ElementModel(name: String, properties: Iterable[Property[_, _]], children: Iterable[ElementChild])
   object ElementModel {
     def unsafe(name: String, properties: Seq[Property[_, _]], children: Iterable[ElementChild]) = ElementModel(name, properties, children)
   }
