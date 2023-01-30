@@ -11,7 +11,7 @@ case class Button(label: String) {
 case class Display(label: String, o: Observable[Int]) {
   val view = div()(
     h1()(label),
-    o
+    div(o.text())
   )
 }
 
@@ -28,7 +28,7 @@ case class Counter() {
     .fold(0)(_ + _)
     .remember()
 
-  val view = div(bplus.view, bminus.view, counter)
+  val view = div(bplus.view, bminus.view, counter.text())
 }
 
 val unsafe = ElementModel.unsafe(
@@ -39,22 +39,24 @@ val unsafe = ElementModel.unsafe(
 
 object Main extends App {
   val ticker = {
-    val o = Observable.periodic(1000).remember()
+    val o = Observable.periodic(1000).remember().text()
 
     val disableButton = Button("disable")
     val chooser       = disableButton.clicks.mapTo(1).fold(0)(_ + _).startWith(0).map(_ % 2 == 0).remember()
 
-    val tab1          = Button("tab1")
+    val tab1          = Button("tab1 test")
     val tab2          = Button("tab2")
     val tabObservable = Observable.merge(tab1.clicks.mapTo("tab1"), tab2.clicks.mapTo("tab2")).startWith("tab1")
 
-    val nested = div(classStyle := List(backgroundColor := "orange"))(
+    val nested: ElementChild = div(classStyle := List(backgroundColor := "orange"))(
       button(disabled := chooser)("disabled?"),
       disableButton.view,
       div()(chooser.map(v => if (v) div(o) else "false"))
     )
 
-    div()(tab1.view, tab2.view, tabObservable.map(t => if (t == "tab1") nested else "tab2"))
+//    div()(tab1.view, tab2.view, tabObservable.map(t => if (t == "tab1") nested else "tab2"))
+//    o.map(div(_))
+    div(o)
   }
 
   Renderer.render(document.body, ticker)

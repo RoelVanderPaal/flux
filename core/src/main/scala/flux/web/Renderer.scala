@@ -11,9 +11,6 @@ object Renderer {
     def node          = nodeHolder.node
     def subscriptions = subscriptionsHolder.subscriptions
   }
-  case class PreviousState(nodeHolder: NodeHolder)                                         {
-    def node = nodeHolder.node
-  }
   case class NodeHolder()                                                                  {
     var node: Node = _
   }
@@ -39,35 +36,55 @@ object Renderer {
     }
   }
 
+  case class PreviousState(node: Node, elementChild: ElementChild)
+
   def render(parent: Node, elementChild: ElementChild, previousState: Option[PreviousState] = None): ReturnState = {
     elementChild match {
       case ElementModel(name, properties, children) =>
-//        previousElementChild match {
-//          case Some(ElementModel(previousName, _, _)) if previousName == name =>
-//          case _                                                              =>
-//        }
-        val element               = document.createElement(name)
-        replaceOrAppendChild(element, previousState.map(_.node), parent)
-        val propertySubscriptions = properties.flatMap(handleProperty(element))
-        val childSubscriptions    = children.map((nodeModel: ElementChild) => render(element, nodeModel)).flatMap(_.subscriptions)
+        val (element, previousChildStates) = previousState match {
+          case Some(PreviousState(node: Element, ElementModel(previousName, _, previousChildren))) if previousName == name =>
+            val children1: Iterable[ElementChild] = previousChildren
+            (
+              node,
+              node.childNodes
+                .zip(children1)
+                .map { case (n: Node, e: ElementChild) => PreviousState(n, e) }
+                .map(Option.apply)
+            )
+          case _                                                                                                           =>
+            val e = document.createElement(name)
+            replaceOrAppendChild(e, previousState.map(_.node), parent)
+            (e, Iterable.empty[Option[PreviousState]])
+        }
+        previousChildStates.drop(children.size).flatten.map(_.node).foreach(parent.removeChild)
+        val childSubscriptions             = children
+          .zip(
+            previousChildStates
+              .take(children.size)
+              .toSeq
+              .padTo(children.size, None)
+          )
+          .map { case (e, p) => render(element, e, p) }
+          .flatMap(_.subscriptions)
+        val propertySubscriptions          = properties.flatMap(handleProperty(element))
         ReturnState(NodeHolder(element), SubscriptionsHolder(childSubscriptions ++ propertySubscriptions))
-      case o: Observable[NodeModel]                 =>
-        val nodeHolder                = previousState.map(_.nodeHolder).getOrElse {
+      case o: Observable[ElementChild]              =>
+        val nodeHolder                = previousState.map(s => NodeHolder(s.node)).getOrElse {
           val comment = document.createComment("placeholder for stream")
           replaceOrAppendChild(comment, None, parent)
           NodeHolder(comment)
         }
         val parentSubscriptionsHolder = SubscriptionsHolder.empty
-        val subscription              = o.subscribe(new Subscriber[NodeModel] {
-          var latest                              = Option.empty[NodeModel]
-          val r                                   = ReturnState(
+        val subscription              = o.subscribe(new Subscriber[ElementChild] {
+          var latest                                 = Option.empty[ElementChild]
+          val r                                      = ReturnState(
             nodeHolder,
             SubscriptionsHolder.empty
           )
-          override def onNext(t: NodeModel): Unit = {
+          override def onNext(t: ElementChild): Unit = {
             r.subscriptions.foreach(_.unsubscribe())
             parentSubscriptionsHolder.subscriptions = parentSubscriptionsHolder.subscriptions.filterNot(r.subscriptions.toList.contains)
-            val renderResult = render(parent, t, Some(PreviousState(nodeHolder)))
+            val renderResult = render(parent, t, Some(PreviousState(nodeHolder.node, t)))
             latest = Some(t)
             r.nodeHolder.node = renderResult.nodeHolder.node
             r.subscriptionsHolder.subscriptions = renderResult.subscriptionsHolder.subscriptions
@@ -79,16 +96,16 @@ object Renderer {
         parentSubscriptionsHolder.subscriptions = parentSubscriptionsHolder.subscriptions ++ Iterable(subscription)
         ReturnState(nodeHolder, parentSubscriptionsHolder)
       case text: String                             =>
-        val n = previousState.map(_.node) match {
-          case Some(currentText: Text) =>
-            currentText.data = text.toString
+        val node = previousState match {
+          case Some(PreviousState(currentText: Text, _: String)) =>
+            currentText.data = text
             currentText
-          case nonText                 =>
-            val text1 = document.createTextNode(text.toString)
-            replaceOrAppendChild(text1, nonText, parent)
-            text1
+          case _                                                 =>
+            val textNode = document.createTextNode(text)
+            replaceOrAppendChild(textNode, previousState.map(_.node), parent)
+            textNode
         }
-        ReturnState(NodeHolder(n), SubscriptionsHolder.empty)
+        ReturnState(NodeHolder(node), SubscriptionsHolder.empty)
     }
   }
 

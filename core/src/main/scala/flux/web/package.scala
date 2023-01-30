@@ -1,15 +1,15 @@
 package flux
 import flux.streams.{Observable, Subscriber}
 import org.scalajs.dom.{Event, MouseEvent}
+
 import scala.language.implicitConversions
 
 package object web {
 
   type NodeModel    = String | ElementModel
-  type ElementChild = NodeModel | Observable[NodeModel | Observable[NodeModel]]
-  private case class ElementModel(name: String, properties: Iterable[Property[_, _]], children: Iterable[ElementChild])
+  type ElementChild = NodeModel | Observable[NodeModel]
 
-  given Conversion[Observable[Int], Observable[String]] = _.text()
+  private case class ElementModel(name: String, properties: Iterable[Property[_, _]], children: Iterable[ElementChild])
 
   private trait Scope
   private trait ElementScope           extends Scope
