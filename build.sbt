@@ -19,3 +19,11 @@ lazy val example = project
     scalacOptions ++= Seq("-deprecation", "-feature", "-language:implicitConversions")
   )
   .dependsOn(core)
+
+lazy val todomvc = (project in file("examples/todomvc"))
+  .enablePlugins(ScalaJSPlugin)
+  .settings(
+    scalaJSUseMainModuleInitializer := true,
+    scalacOptions ++= Seq("-deprecation", "-feature", "-language:implicitConversions")
+  )
+  .dependsOn(core)

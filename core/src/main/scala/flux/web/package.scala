@@ -1,6 +1,6 @@
 package flux
 import flux.streams.{Observable, Subscriber}
-import org.scalajs.dom.{Event, MouseEvent}
+import org.scalajs.dom.{Event, KeyboardEvent, MouseEvent}
 
 import scala.language.implicitConversions
 
@@ -79,14 +79,33 @@ package object web {
     def :=(value: Iterable[CssProperty]) = SelectorProperty(this, value)
   }
 
-  case object div    extends ElementModelFactory[ElementScope | HTMLElementScope]("div")
-  case object h1     extends ElementModelFactory[ElementScope | HTMLElementScope]("h1")
-  case object button extends ElementModelFactory[ElementScope | HTMLElementScope | HTMLButtonElementScope]("button")
+  case object div     extends ElementModelFactory[ElementScope | HTMLElementScope]("div")
+  case object section extends ElementModelFactory[ElementScope | HTMLElementScope]("section")
+  case object header  extends ElementModelFactory[ElementScope | HTMLElementScope]("header")
+  case object footer  extends ElementModelFactory[ElementScope | HTMLElementScope]("footer")
+  case object h1      extends ElementModelFactory[ElementScope | HTMLElementScope]("h1")
+  case object input   extends ElementModelFactory[ElementScope | HTMLElementScope]("input")
+  case object label   extends ElementModelFactory[ElementScope | HTMLElementScope]("label")
+  case object span    extends ElementModelFactory[ElementScope | HTMLElementScope]("span")
+  case object strong  extends ElementModelFactory[ElementScope | HTMLElementScope]("strong")
+  case object ul      extends ElementModelFactory[ElementScope | HTMLElementScope]("ul")
+  case object li      extends ElementModelFactory[ElementScope | HTMLElementScope]("li")
+  case object a       extends ElementModelFactory[ElementScope | HTMLElementScope]("a")
+  case object button  extends ElementModelFactory[ElementScope | HTMLElementScope | HTMLButtonElementScope]("button")
 
-  case object disabled   extends WritableName[Boolean, HTMLButtonElementScope]
-  case object classStyle extends WritableName[Iterable[CssProperty | SelectorProperty], HTMLElementScope]
+  case object disabled    extends WritableName[Boolean, HTMLButtonElementScope]
+  case object checked     extends WritableName[Boolean, HTMLElementScope]
+  case object autofocus   extends WritableName[Boolean, HTMLElementScope]
+  case object className   extends WritableName[String, ElementScope]
+  case object id          extends WritableName[String, ElementScope]
+  case object `for`       extends WritableName[String, ElementScope]
+  case object href        extends WritableName[String, ElementScope]
+  case object placeholder extends WritableName[String, ElementScope]
+  case object `type`      extends WritableName[String, ElementScope]
+  case object classStyle  extends WritableName[Iterable[CssProperty | SelectorProperty], HTMLElementScope]
 
   case object onclick extends EventName[MouseEvent, HTMLElementScope]
+  case object onkeyup extends EventName[KeyboardEvent, HTMLElementScope]
 
   case object backgroundColor extends CssName("background-color")
 

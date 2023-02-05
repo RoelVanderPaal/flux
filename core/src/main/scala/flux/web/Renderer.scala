@@ -41,23 +41,23 @@ object Renderer {
   def render(parent: Node, elementChild: ElementChild, previousState: Option[PreviousState] = None): ReturnState = {
     elementChild match {
       case ElementModel(name, properties, children) =>
-        val (element, previousChildStates) = previousState match {
-          case Some(PreviousState(node: Element, ElementModel(previousName, _, previousChildren))) if previousName == name =>
-            val children1: Iterable[ElementChild] = previousChildren
+        val (element, previousProperties, previousChildren) = previousState match {
+          case Some(PreviousState(node: Element, ElementModel(previousName, previousProperties, previousChildren)))
+              if previousName == name =>
+            (node, previousProperties, previousChildren)
+          case _ =>
             (
-              node,
-              node.childNodes
-                .zip(children1)
-                .map { case (n: Node, e: ElementChild) => PreviousState(n, e) }
-                .map(Option.apply)
+              replaceOrAppendChild(document.createElement(name), previousState.map(_.node), parent),
+              Iterable.empty[Property[_, _]],
+              Iterable.empty[ElementChild]
             )
-          case _                                                                                                           =>
-            val e = document.createElement(name)
-            replaceOrAppendChild(e, previousState.map(_.node), parent)
-            (e, Iterable.empty[Option[PreviousState]])
         }
-        previousChildStates.drop(children.size).flatten.map(_.node).foreach(parent.removeChild)
-        val childSubscriptions             = children
+        // children
+        val previousChildStates                             = element.childNodes
+          .zip(previousChildren)
+          .map { case (n: Node, e: ElementChild) => PreviousState(n, e) }
+          .map(Option.apply)
+        val childSubscriptions                              = children
           .zip(
             previousChildStates
               .take(children.size)
@@ -66,7 +66,13 @@ object Renderer {
           )
           .map { case (e, p) => render(element, e, p) }
           .flatMap(_.subscriptions)
-        val propertySubscriptions          = properties.flatMap(handleProperty(element))
+        previousChildStates.drop(children.size).flatten.map(_.node).foreach(element.removeChild)
+
+        // properties
+        val propertySubscriptions = properties.toSet.diff(previousProperties.toSet).flatMap(handleProperty(element))
+        // remove previous properties
+        previousProperties.map(_.key.name).toSet.diff(properties.map(_.key.name).toSet).foreach(element.removeAttribute)
+
         ReturnState(NodeHolder(element), SubscriptionsHolder(childSubscriptions ++ propertySubscriptions))
       case o: Observable[ElementChild]              =>
         val nodeHolder                = previousState.map(s => NodeHolder(s.node)).getOrElse {
@@ -84,7 +90,7 @@ object Renderer {
           override def onNext(t: ElementChild): Unit = {
             r.subscriptions.foreach(_.unsubscribe())
             parentSubscriptionsHolder.subscriptions = parentSubscriptionsHolder.subscriptions.filterNot(r.subscriptions.toList.contains)
-            val renderResult = render(parent, t, Some(PreviousState(nodeHolder.node, t)))
+            val renderResult = render(parent, t, Some(PreviousState(nodeHolder.node, latest.getOrElse("placeholder"))))
             latest = Some(t)
             r.nodeHolder.node = renderResult.nodeHolder.node
             r.subscriptionsHolder.subscriptions = renderResult.subscriptionsHolder.subscriptions
@@ -109,6 +115,7 @@ object Renderer {
     }
   }
 
+  val ATTRIBUTE_MAPPINGS                                                                           = Map("className" -> "class")
   private def handleProperty[Value](element: Element)(p: Property[Value, _]): Option[Subscription] = {
     def setAttribute[Value](key: Name[_, _], value: Value) = value match {
       case ps: Iterable[CssProperty | SelectorProperty] =>
@@ -119,12 +126,13 @@ object Renderer {
         }
         element.setAttribute("class", className)
       case _                                            =>
+        val k = ATTRIBUTE_MAPPINGS.getOrElse(key.name, key.name)
         value match {
           case b: Boolean => if (b) Some("") else None
           case v          => Some(v.toString)
         } match {
-          case Some(s) => element.setAttribute(key.name, s)
-          case None    => element.removeAttribute(key.name)
+          case Some(s) => element.setAttribute(k, s)
+          case None    => element.removeAttribute(k)
         }
 
     }
@@ -132,6 +140,9 @@ object Renderer {
     p match {
       case SubscriberProperty(key, subscriber: Subscriber[Value]) =>
         Observable.fromEventListener(element, key.name).subscribe(subscriber)
+        None
+      case SimpleProperty(key, value: Value) if key.name == "id"  =>
+        element.id = value.toString
         None
       case SimpleProperty(key, value: Value)                      =>
         setAttribute(key, value)
@@ -145,11 +156,12 @@ object Renderer {
     }
   }
 
-  private def replaceOrAppendChild(node: Node, existing: Option[Node], parent: Node): Unit = {
+  private def replaceOrAppendChild[T <: Node](node: T, existing: Option[Node], parent: Node): T = {
     existing match {
       case Some(e) => parent.replaceChild(node, e)
       case None    => parent.appendChild(node)
     }
+    node
   }
 
   private def cssProperties2String(className: String, properties: Iterable[CssProperty | SelectorProperty]): String = {

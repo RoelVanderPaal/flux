@@ -39,7 +39,7 @@ val unsafe = ElementModel.unsafe(
 
 object Main extends App {
   val ticker = {
-    val o = Observable.periodic(1000).remember().text()
+    val o = Observable.periodic(1000).remember()
 
     val disableButton = Button("disable")
     val chooser       = disableButton.clicks.mapTo(1).fold(0)(_ + _).startWith(0).map(_ % 2 == 0).remember()
@@ -51,12 +51,13 @@ object Main extends App {
     val nested: ElementChild = div(classStyle := List(backgroundColor := "orange"))(
       button(disabled := chooser)("disabled?"),
       disableButton.view,
-      div()(chooser.map(v => if (v) div(o) else "false"))
+      div()(chooser.map(v => if (v) div(o.text()) else "false"))
     )
 
 //    div()(tab1.view, tab2.view, tabObservable.map(t => if (t == "tab1") nested else "tab2"))
 //    o.map(div(_))
-    div(o)
+//    button(disabled := o.map(_ % 2 == 0))("lange text" * 5)
+    div(disableButton.view, div(chooser.map(v => if (v) button(disabled := o.map(_ % 2 == 0))("yes") else button("no"))))
   }
 
   Renderer.render(document.body, ticker)
