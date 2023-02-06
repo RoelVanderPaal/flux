@@ -139,8 +139,7 @@ object Renderer {
 
     p match {
       case SubscriberProperty(key, subscriber: Subscriber[Value]) =>
-        Observable.fromEventListener(element, key.name).subscribe(subscriber)
-        None
+        Some(Observable.fromEventListener(element, key.name).subscribe(subscriber))
       case SimpleProperty(key, value: Value) if key.name == "id"  =>
         element.id = value.toString
         None
