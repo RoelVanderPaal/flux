@@ -6,7 +6,8 @@ import scala.language.implicitConversions
 
 package object web {
 
-  type NodeModel    = String | ElementModel
+  case object EmptyNode
+  type NodeModel    = String | ElementModel | EmptyNode.type
   type ElementChild = NodeModel | Observable[NodeModel]
 
   private case class ElementModel(name: String, properties: Iterable[Property[_, _]], children: Iterable[ElementChild])
@@ -104,8 +105,9 @@ package object web {
   case object `type`      extends WritableName[String, ElementScope]
   case object classStyle  extends WritableName[Iterable[CssProperty | SelectorProperty], HTMLElementScope]
 
-  case object onclick extends EventName[MouseEvent, HTMLElementScope]
-  case object onkeyup extends EventName[KeyboardEvent, HTMLElementScope]
+  case object onchange extends EventName[MouseEvent, HTMLElementScope]
+  case object onclick  extends EventName[MouseEvent, HTMLElementScope]
+  case object onkeyup  extends EventName[KeyboardEvent, HTMLElementScope]
 
   case object backgroundColor extends CssName("background-color")
 

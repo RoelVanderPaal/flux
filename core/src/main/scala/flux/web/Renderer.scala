@@ -40,6 +40,15 @@ object Renderer {
 
   def render(parent: Node, elementChild: ElementChild, previousState: Option[PreviousState] = None): ReturnState = {
     elementChild match {
+      case EmptyNode                                =>
+        val node = previousState match {
+          case Some(PreviousState(currentComment: Comment, EmptyNode)) => currentComment
+          case _                                                       =>
+            val commentNode = document.createComment("emptyNode")
+            replaceOrAppendChild(commentNode, previousState.map(_.node), parent)
+            commentNode
+        }
+        ReturnState(NodeHolder(node), SubscriptionsHolder.empty)
       case ElementModel(name, properties, children) =>
         val (element, previousProperties, previousChildren) = previousState match {
           case Some(PreviousState(node: Element, ElementModel(previousName, previousProperties, previousChildren)))
@@ -127,12 +136,13 @@ object Renderer {
         element.setAttribute("class", className)
       case _                                            =>
         val k = ATTRIBUTE_MAPPINGS.getOrElse(key.name, key.name)
-        value match {
-          case b: Boolean => if (b) Some("") else None
-          case v          => Some(v.toString)
-        } match {
-          case Some(s) => element.setAttribute(k, s)
-          case None    => element.removeAttribute(k)
+        (k, value) match {
+          case ("checked", b: Boolean) => element.asInstanceOf[HTMLInputElement].checked = b
+          case _                       =>
+            value match {
+              case b: Boolean =>
+              case v          => element.setAttribute(k, v.toString)
+            }
         }
 
     }
