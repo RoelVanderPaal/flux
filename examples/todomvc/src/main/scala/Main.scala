@@ -58,6 +58,7 @@ import Action.*
   enterPresseds.subscribeNext(_.value = "")
   enterPresseds
     .map(_.value.trim())
+    .filter(_ != "")
     .map(Action.Add.apply)
     .subscribe(actions)
 
@@ -85,6 +86,7 @@ import Action.*
     .startWith(INIT_STATE)
     .remember()
   val todos = state.map(_.todos).remember()
+  val empty = todos.map(_.isEmpty).remember()
   todos.subscribe(new Subscriber[List[TodoItem]] {
     override def onNext(t: List[TodoItem]): Unit = {
       import js.JSConverters.*
@@ -101,7 +103,6 @@ import Action.*
 
     override def onCompleted: Unit = {}
   })
-  val empty = todos.map(_.isEmpty).remember()
 
   val selectedFilter = RememberSubject[String]()
   val filters        = List("All", "Active", "Completed").map(Filter(selectedFilter))
@@ -170,7 +171,12 @@ import Action.*
         footer(className := "footer")(
           span(className := "todo-count")(strong(todos.map(_.filterNot(_.completed).length).text()), " item left"),
           ul(className := "filters")(filters.map(_.view): _*),
-          button(className := "clear-completed", onclick := actions.preProcess(_.mapTo(ClearCompleted)))("Clear completed")
+          todos
+            .map(_.exists(_.completed))
+            .map(v =>
+              if (v) button(className := "clear-completed", onclick := actions.preProcess(_.mapTo(ClearCompleted)))("Clear completed")
+              else EmptyNode
+            )
         )
     )
   )
