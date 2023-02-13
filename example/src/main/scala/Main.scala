@@ -60,5 +60,5 @@ object Main extends App {
     div(disableButton.view, div(chooser.map(v => if (v) button(disabled := o.map(_ % 2 == 0))("yes") else button("no"))))
   }
 
-  Renderer.render(document.body, ticker)
+  Renderer.renderInternal(document.body, ticker)
 }

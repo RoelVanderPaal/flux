@@ -1,3 +1,4 @@
+import flux.streams.constructor.EventListenerObservable
 import flux.streams.{Observable, RememberSubject, Subject, Subscriber}
 import flux.web.*
 import org.scalajs.dom.*
@@ -21,7 +22,7 @@ case class Filter(selected: Observable[String])(label: String) {
 @JSExportAll
 case class TodoItem(key: Key, completed: Boolean, label: String)
 
-case class State(todos: List[TodoItem], toggleAll: Boolean)
+case class State(todos: List[TodoItem], toggleAll: Boolean, edit: Option[Key] = None)
 
 enum Action {
   case Add(value: String)
@@ -30,6 +31,9 @@ enum Action {
   case Destroy(key: Key)
   case Toggle(key: Key)
   case ToggleAll
+  case Edit(key: Key)
+  case Save(key: Key, value: String)
+  case ExitEdit
 }
 
 trait TodoItemObject extends js.Object {
@@ -54,6 +58,7 @@ import Action.*
 
   val actions       = Subject[Action]()
   val enterPresseds = Subject[HTMLInputElement]()
+  val edit          = Subject[Option[Key]]()
 
   enterPresseds.subscribeNext(_.value = "")
   enterPresseds
@@ -61,9 +66,10 @@ import Action.*
     .filter(_ != "")
     .map(Action.Add.apply)
     .subscribe(actions)
+  EventListenerObservable[KeyboardEvent](document, "keyup").filter(_.key == "Escape").mapTo(ExitEdit).subscribe(actions)
 
   val state = actions
-    .fold(INIT_STATE) { case (State(todos, toggleAll), action) =>
+    .fold(INIT_STATE) { case (State(todos, toggleAll, e), action) =>
       val newTodos     = action match {
         case Add(v)                              => TodoItem(createKey(), false, v) :: todos
         case SetCompletedAll(completed: Boolean) => todos.map(_.copy(completed = completed))
@@ -75,13 +81,25 @@ import Action.*
             case t                                         => t
           }
         case ToggleAll                           => todos.map(_.copy(completed = !toggleAll))
+        case Save(key, label)                    =>
+          todos.map {
+            case TodoItem(k, completed, _) if k == key => TodoItem(k, completed, label)
+            case t                                     => t
+          }
+        case _                                   => todos
       }
       val newToggleAll = action match {
         case ToggleAll      => !toggleAll
         case ClearCompleted => false
         case _              => newTodos.nonEmpty && newTodos.forall(_.completed)
       }
-      State(newTodos, newToggleAll)
+      val newEdit      = action match {
+        case Edit(ne)   => Some(ne)
+        case ExitEdit   => None
+        case Save(_, _) => None
+        case _          => e
+      }
+      State(newTodos, newToggleAll, newEdit)
     }
     .startWith(INIT_STATE)
     .remember()
@@ -119,66 +137,89 @@ import Action.*
         placeholder := "What needs to be done?",
         autofocus   := true,
         onkeyup     := enterPresseds.preProcess(
-          _.filter(_.keyCode == 13)
+          _.filter(_.key == "Enter")
             .map(_.target.asInstanceOf[HTMLInputElement])
         )
       )()
     ),
-    empty.map(v =>
-      if (v) EmptyNode
-      else
-        section(className := "main")(
-          input(
-            id        := "toggle-all",
-            className := "toggle-all",
-            `type`    := "checkbox",
-            onchange  := actions.preProcess(_.mapTo(ToggleAll)),
-            checked   := state.map(_.toggleAll)
-          )(),
-          label(`for` := "toggle-all")("Mark all as completed"),
-          Observable
-            .combine(todos, selectedFilter)
-            .map { case (ts, f) =>
-              f match {
-                case "All"       => ts
-                case "Active"    => ts.filterNot(_.completed)
-                case "Completed" => ts.filter(_.completed)
-              }
-            }
-            .map(ts =>
-              ul(className := "todo-list")(
-                ts.map(t =>
-                  li(className := (if (t.completed) "completed" else ""))(
-                    div(className := "view")(
-                      input(
-                        className := "toggle",
-                        `type`    := "checkbox",
-                        checked   := t.completed,
-                        onchange  := actions.preProcess(_.mapTo(t.key).map(Toggle.apply))
-                      )(),
-                      label()(s"${t.label}"),
-                      button(className := "destroy", onclick := actions.preProcess(_.mapTo(t.key).map(Destroy.apply)))("")
-                    )
+    empty
+//      .dropRepeats()
+      .map(v =>
+        if (v) EmptyNode
+        else
+          section(className := "main")(
+//            input(
+//              id        := "toggle-all",
+//              className := "toggle-all",
+//              `type`    := "checkbox",
+//              onchange  := actions.preProcess(_.mapTo(ToggleAll)),
+//              checked   := state.map(_.toggleAll)
+//            )(),
+//            label(`for` := "toggle-all")("Mark all as completed"),
+            Observable
+              .combine(state, selectedFilter)
+              .map {
+                case (state, f) => {
+                  val ts  = state.todos
+                  val tds = f match {
+                    case "All"       => ts
+                    case "Active"    => ts.filterNot(_.completed)
+                    case "Completed" => ts.filter(_.completed)
+                  }
+                  ul(
+                    className := "todo-list"
+                  )(
+                    tds.map(t =>
+                      li(
+                        className := List(
+                          Option.when(t.completed)("completed"),
+                          state.edit.flatMap(k => Option.when(t.key == k)("editing"))
+                        ).flatten.mkString(" ")
+                      )(
+                        div(className := "view")(
+                          input(
+                            className := "toggle",
+                            `type`    := "checkbox",
+                            checked   := t.completed,
+                            onchange  := actions.preProcess(_.mapTo(t.key).map(Toggle.apply))
+                          )(),
+                          label(ondblclick := actions.preProcess(_.mapTo(Edit(t.key))))(s"${t.label}"),
+                          button(className := "destroy", onclick := actions.preProcess(_.mapTo(t.key).map(Destroy.apply)))("")
+                        ),
+                        input(
+                          className := "edit",
+                          value     := t.label,
+                          onkeyup   := actions.preProcess(
+                            _.filter(_.key == "Enter")
+                              .map(_.target.asInstanceOf[HTMLInputElement])
+                              .map(e => Save(t.key, e.value.trim))
+                          ),
+                          onblur    := actions.preProcess(
+                            _.map(_.target.asInstanceOf[HTMLInputElement])
+                              .map(e => Save(t.key, e.value.trim))
+                          )
+                        )()
+                      )
+                    ): _*
                   )
-                ): _*
-              )
-            )
-        )
-    ),
-    empty.map(v =>
-      if (v) EmptyNode
-      else
-        footer(className := "footer")(
-          span(className := "todo-count")(strong(todos.map(_.filterNot(_.completed).length).text()), " item left"),
-          ul(className := "filters")(filters.map(_.view): _*),
-          todos
-            .map(_.exists(_.completed))
-            .map(v =>
-              if (v) button(className := "clear-completed", onclick := actions.preProcess(_.mapTo(ClearCompleted)))("Clear completed")
-              else EmptyNode
-            )
-        )
-    )
+                }
+              }
+          )
+      )
+//    empty.map(v =>
+//      if (v) EmptyNode
+//      else
+//        footer(className := "footer")(
+//          span(className := "todo-count")(strong(todos.map(_.filterNot(_.completed).length).text()), " item left"),
+//          ul(className := "filters")(filters.map(_.view): _*),
+//          todos
+//            .map(_.exists(_.completed))
+//            .map(v =>
+//              if (v) button(className := "clear-completed", onclick := actions.preProcess(_.mapTo(ClearCompleted)))("Clear completed")
+//              else EmptyNode
+//            )
+//        )
+//    )
   )
 
   Renderer.render(document.body, app)

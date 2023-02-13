@@ -9,7 +9,8 @@ lazy val core = project
     libraryDependencies ++= Seq(
       "org.scala-js"  %%% "scalajs-dom" % "2.3.0",
       "org.scalatest" %%% "scalatest"   % "3.2.15" % Test
-    )
+    ),
+    jsEnv := new org.scalajs.jsenv.jsdomnodejs.JSDOMNodeJSEnv()
   )
 
 lazy val example = project

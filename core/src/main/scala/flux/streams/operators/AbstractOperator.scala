@@ -6,13 +6,13 @@ import flux.streams.{Observable, Subscriber}
 abstract class AbstractOperator[T, U](o: Observable[T]) extends AbstractObservable[U] {
   private var parentSubscriber = Option.empty[Subscriber[T]]
 
-  def handleOnNext(subscribers: Iterable[Subscriber[U]], t: T): Unit
+  def handleOnNext(t: T): Unit
 
   override def onStart(): Unit = {
     val subscriber = new Subscriber[T] {
-      override def onNext(t: T): Unit = handleOnNext(subscribers, t)
+      override def onNext(t: T): Unit = handleOnNext(t)
 
-      override def onCompleted: Unit = subscribers.foreach(_.onCompleted)
+      override def onCompleted: Unit = handleCompleted()
     }
     parentSubscriber = Some(subscriber)
     o.subscribe(subscriber)

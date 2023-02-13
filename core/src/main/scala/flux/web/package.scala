@@ -1,6 +1,6 @@
 package flux
 import flux.streams.{Observable, Subscriber}
-import org.scalajs.dom.{Event, KeyboardEvent, MouseEvent}
+import org.scalajs.dom.{Event, FocusEvent, KeyboardEvent, MouseEvent}
 
 import scala.language.implicitConversions
 
@@ -103,11 +103,14 @@ package object web {
   case object href        extends WritableName[String, ElementScope]
   case object placeholder extends WritableName[String, ElementScope]
   case object `type`      extends WritableName[String, ElementScope]
+  case object value       extends WritableName[String, ElementScope]
   case object classStyle  extends WritableName[Iterable[CssProperty | SelectorProperty], HTMLElementScope]
 
-  case object onchange extends EventName[MouseEvent, HTMLElementScope]
-  case object onclick  extends EventName[MouseEvent, HTMLElementScope]
-  case object onkeyup  extends EventName[KeyboardEvent, HTMLElementScope]
+  case object onchange   extends EventName[MouseEvent, HTMLElementScope]
+  case object onclick    extends EventName[MouseEvent, HTMLElementScope]
+  case object ondblclick extends EventName[MouseEvent, HTMLElementScope]
+  case object onkeyup    extends EventName[KeyboardEvent, HTMLElementScope]
+  case object onblur     extends EventName[FocusEvent, HTMLElementScope]
 
   case object backgroundColor extends CssName("background-color")
 

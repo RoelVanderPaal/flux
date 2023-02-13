@@ -3,9 +3,9 @@ import flux.streams.{Observable, Subscriber, Subscription}
 
 case class RememberOperator[T](o: Observable[T]) extends AbstractOperator[T, T](o) {
   var last                                                                    = Option.empty[T]
-  override def handleOnNext(subscribers: Iterable[Subscriber[T]], t: T): Unit = {
+  override def handleOnNext(t: T): Unit = {
     last = Some(t)
-    subscribers.foreach(_.onNext(t))
+    handleNext(t)
   }
 
   override def subscribe[S >: T](subscriber: Subscriber[S]): Subscription = {

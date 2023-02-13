@@ -1,6 +1,7 @@
 package flux.web
-import flux.streams.constructor.AbstractObservable
-import flux.streams.{Observable, Subscriber, Subscription}
+import flux.streams.constructor.{AbstractObservable, BasicSubscription, EventListenerObservable}
+import flux.streams.operators.{Queue, QueuedOperator}
+import flux.streams.{Observable, Subject, Subscriber, Subscription}
 import org.scalajs.dom.*
 
 import scala.annotation.nowarn
@@ -37,8 +38,26 @@ object Renderer {
   }
 
   case class PreviousState(node: Node, elementChild: ElementChild)
+  def render(parent: Node, elementChild: ElementChild): Unit = {
+    val queue = Subject[() => Unit]()
+    renderInternal(parent, elementChild, None)(queue)
+    queue.subscribeNext(_())
+  }
 
-  def render(parent: Node, elementChild: ElementChild, previousState: Option[PreviousState] = None): ReturnState = {
+  private def renderInternal(
+    parent: Node,
+    elementChild: ElementChild,
+    previousState: Option[PreviousState] = None
+  )(implicit queue: Queue
+  ): ReturnState = {
+    def replaceOrAppendChild[T <: Node](node: T, existing: Option[Node], parent: Node): T = {
+      existing match {
+        case Some(e) => parent.replaceChild(node, e)
+        case None    => parent.appendChild(node)
+      }
+      node
+    }
+
     elementChild match {
       case EmptyNode                                =>
         val node = previousState match {
@@ -73,7 +92,7 @@ object Renderer {
               .toSeq
               .padTo(children.size, None)
           )
-          .map { case (e, p) => render(element, e, p) }
+          .map { case (e, p) => renderInternal(element, e, p) }
           .flatMap(_.subscriptions)
         previousChildStates.drop(children.size).flatten.map(_.node).foreach(element.removeChild)
 
@@ -99,7 +118,7 @@ object Renderer {
           override def onNext(t: ElementChild): Unit = {
             r.subscriptions.foreach(_.unsubscribe())
             parentSubscriptionsHolder.subscriptions = parentSubscriptionsHolder.subscriptions.filterNot(r.subscriptions.toList.contains)
-            val renderResult = render(parent, t, Some(PreviousState(nodeHolder.node, latest.getOrElse("placeholder"))))
+            val renderResult = renderInternal(parent, t, Some(PreviousState(nodeHolder.node, latest.getOrElse("placeholder"))))
             latest = Some(t)
             r.nodeHolder.node = renderResult.nodeHolder.node
             r.subscriptionsHolder.subscriptions = renderResult.subscriptionsHolder.subscriptions
@@ -124,8 +143,8 @@ object Renderer {
     }
   }
 
-  val ATTRIBUTE_MAPPINGS                                                                           = Map("className" -> "class")
-  private def handleProperty[Value](element: Element)(p: Property[Value, _]): Option[Subscription] = {
+  val ATTRIBUTE_MAPPINGS = Map("className" -> "class")
+  private def handleProperty[Value](element: Element)(p: Property[Value, _])(implicit queue: Queue): Option[Subscription] = {
     def setAttribute[Value](key: Name[_, _], value: Value) = value match {
       case ps: Iterable[CssProperty | SelectorProperty] =>
         val className = s"flux-${ps.map(_.toString).hashCode()}"
@@ -163,14 +182,6 @@ object Renderer {
           override def onCompleted: Unit = {}
         }))
     }
-  }
-
-  private def replaceOrAppendChild[T <: Node](node: T, existing: Option[Node], parent: Node): T = {
-    existing match {
-      case Some(e) => parent.replaceChild(node, e)
-      case None    => parent.appendChild(node)
-    }
-    node
   }
 
   private def cssProperties2String(className: String, properties: Iterable[CssProperty | SelectorProperty]): String = {

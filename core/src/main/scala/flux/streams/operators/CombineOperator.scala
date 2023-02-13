@@ -12,7 +12,7 @@ case class CombineOperator[T1, T2](o1: Observable[T1], o2: Observable[T2]) exten
   private def combinedOnNext() = for {
     v1 <- last1
     v2 <- last2
-  } subscribers.foreach(_.onNext((v1, v2)))
+  } handleNext((v1, v2))
 
   override def onStart(): Unit = {
     val subscriber1 = new Subscriber[T1] {
@@ -21,7 +21,7 @@ case class CombineOperator[T1, T2](o1: Observable[T1], o2: Observable[T2]) exten
         combinedOnNext()
       }
 
-      override def onCompleted: Unit = subscribers.foreach(_.onCompleted)
+      override def onCompleted: Unit = handleCompleted()
     }
     o1.subscribe(subscriber1)
     s1 = Some(subscriber1)
@@ -31,7 +31,7 @@ case class CombineOperator[T1, T2](o1: Observable[T1], o2: Observable[T2]) exten
         combinedOnNext()
       }
 
-      override def onCompleted: Unit = subscribers.foreach(_.onCompleted)
+      override def onCompleted: Unit = handleCompleted()
     }
     o2.subscribe(subscriber2)
     s2 = Some(subscriber2)

@@ -8,9 +8,9 @@ case class MergeOperator[T](observables: Iterable[Observable[T]]) extends Abstra
 
   override def onStart(): Unit = {
     val subscriber = new Subscriber[T] {
-      override def onNext(t: T): Unit = subscribers.foreach(_.onNext(t))
+      override def onNext(t: T): Unit = handleNext(t)
 
-      override def onCompleted: Unit = subscribers.foreach(_.onCompleted)
+      override def onCompleted: Unit = handleCompleted()
     }
     observables.foreach(_.subscribe(subscriber))
     parentSubscriber = Some(subscriber)

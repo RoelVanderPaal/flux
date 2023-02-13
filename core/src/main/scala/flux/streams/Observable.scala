@@ -12,16 +12,17 @@ trait Observable[+T] {
   def unsubscribe[S >: T](subscriber: Subscriber[S]): Unit
   def debug: String
 
-  def filter(f: T => Boolean): Observable[T]               = FilterOperator(this, f)
-  def map[U](f: T => U): Observable[U]                     = MapOperator(this, f)
-  def mapTo[U](to: U): Observable[U]                       = MapOperator(this, _ => to)
-  def text(): Observable[String]                           = MapOperator(this, _.toString)
-  def fold[U](z: U)(f: (U, T) => U): Observable[U]         = FoldOperator(this, z, f)
-  def drop(n: Int): Observable[T]                          = DropOperator(this, n)
-  def merge[T2](o2: Observable[T2]): Observable[T | T2]    = MergeOperator(Iterable(this, o2))
-  def remember(): Observable[T]                            = RememberOperator(this)
-  def startWith[U >: T](start: U): Observable[U]           = StartWithOperator(this, start)
-  def combine[T2](o2: Observable[T2]): Observable[(T, T2)] = CombineOperator(this, o2)
+  def filter(f: T => Boolean): Observable[T]                                              = FilterOperator(this, f)
+  def map[U](f: T => U): Observable[U]                                                    = MapOperator(this, f)
+  def mapTo[U](to: U): Observable[U]                                                      = MapOperator(this, _ => to)
+  def text(): Observable[String]                                                          = MapOperator(this, _.toString)
+  def fold[U](z: U)(f: (U, T) => U): Observable[U]                                        = FoldOperator(this, z, f)
+  def drop(n: Int): Observable[T]                                                         = DropOperator(this, n)
+  def merge[T2](o2: Observable[T2]): Observable[T | T2]                                   = MergeOperator(Iterable(this, o2))
+  def remember(): Observable[T]                                                           = RememberOperator(this)
+  def startWith[U >: T](start: U): Observable[U]                                          = StartWithOperator(this, start)
+  def combine[T2](o2: Observable[T2]): Observable[(T, T2)]                                = CombineOperator(this, o2)
+  def dropRepeats(isEqual: (T, T) => Boolean = (t1: T, t2: T) => t1 == t2): Observable[T] = DropRepeatsOperator(this, isEqual)
 
   def subscribeNext(f: T => Unit) = this.subscribe(new Subscriber[T] {
     override def onNext(t: T): Unit = f(t)

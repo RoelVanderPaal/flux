@@ -3,7 +3,7 @@ package flux.streams.constructor
 import flux.streams.{Observable, Subscriber, Subscription}
 
 abstract class AbstractObservable[T] extends Observable[T] {
-  var subscribers = List.empty[Subscriber[T]]
+  private var subscribers = List.empty[Subscriber[T]]
 
   def onStart(): Unit
   def onStop(): Unit = {}
@@ -21,6 +21,9 @@ abstract class AbstractObservable[T] extends Observable[T] {
       onStop()
     }
   }
+
+  protected def handleNext(t: T)  = subscribers.foreach(_.onNext(t))
+  protected def handleCompleted() = subscribers.foreach(_.onCompleted)
 
   override def debug: String = s"${this.toString} ==> ${subscribers.length}"
 }

@@ -12,9 +12,9 @@ case class PeriodicObservable[T](interval: Interval, i: Iterator[T]) extends Abs
     }
     setIntervalHandle = Some(si {
       if (i.hasNext) {
-        subscribers.foreach(_.onNext(i.next()))
+        handleNext(i.next())
       } else {
-        subscribers.foreach(_.onCompleted)
+        handleCompleted()
         onStop()
       }
     })
