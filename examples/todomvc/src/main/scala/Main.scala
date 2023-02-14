@@ -148,14 +148,14 @@ import Action.*
         if (v) EmptyNode
         else
           section(className := "main")(
-//            input(
-//              id        := "toggle-all",
-//              className := "toggle-all",
-//              `type`    := "checkbox",
-//              onchange  := actions.preProcess(_.mapTo(ToggleAll)),
-//              checked   := state.map(_.toggleAll)
-//            )(),
-//            label(`for` := "toggle-all")("Mark all as completed"),
+            input(
+              id        := "toggle-all",
+              className := "toggle-all",
+              `type`    := "checkbox",
+              onchange  := actions.preProcess(_.mapTo(ToggleAll)),
+              checked   := state.map(_.toggleAll)
+            )(),
+            label(`for` := "toggle-all")("Mark all as completed"),
             Observable
               .combine(state, selectedFilter)
               .map {
@@ -192,11 +192,17 @@ import Action.*
                           onkeyup   := actions.preProcess(
                             _.filter(_.key == "Enter")
                               .map(_.target.asInstanceOf[HTMLInputElement])
-                              .map(e => Save(t.key, e.value.trim))
+                              .map(e => {
+                                val trim = e.value.trim
+                                if (trim == "") Destroy(t.key) else Save(t.key, trim)
+                              })
                           ),
                           onblur    := actions.preProcess(
-                            _.map(_.target.asInstanceOf[HTMLInputElement])
-                              .map(e => Save(t.key, e.value.trim))
+                              .map(_.target.asInstanceOf[HTMLInputElement])
+                              .map(e => {
+                                val trim = e.value.trim
+                                if (trim == "") Destroy(t.key) else Save(t.key, trim)
+                              })
                           )
                         )()
                       )
@@ -205,21 +211,21 @@ import Action.*
                 }
               }
           )
-      )
-//    empty.map(v =>
-//      if (v) EmptyNode
-//      else
-//        footer(className := "footer")(
-//          span(className := "todo-count")(strong(todos.map(_.filterNot(_.completed).length).text()), " item left"),
-//          ul(className := "filters")(filters.map(_.view): _*),
-//          todos
-//            .map(_.exists(_.completed))
-//            .map(v =>
-//              if (v) button(className := "clear-completed", onclick := actions.preProcess(_.mapTo(ClearCompleted)))("Clear completed")
-//              else EmptyNode
-//            )
-//        )
-//    )
+      ),
+    empty.map(v =>
+      if (v) EmptyNode
+      else
+        footer(className := "footer")(
+          span(className := "todo-count")(strong(todos.map(_.filterNot(_.completed).length).text()), " item left"),
+          ul(className := "filters")(filters.map(_.view): _*),
+          todos
+            .map(_.exists(_.completed))
+            .map(v =>
+              if (v) button(className := "clear-completed", onclick := actions.preProcess(_.mapTo(ClearCompleted)))("Clear completed")
+              else EmptyNode
+            )
+        )
+    )
   )
 
   Renderer.render(document.body, app)
