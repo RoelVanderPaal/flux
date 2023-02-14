@@ -1,6 +1,6 @@
 package flux.web
 import flux.streams.constructor.{AbstractObservable, BasicSubscription, EventListenerObservable}
-import flux.streams.operators.{Queue, QueuedOperator}
+import flux.streams.operators.{QueueSubscriber, QueuedOperator}
 import flux.streams.{Observable, Subject, Subscriber, Subscription}
 import org.scalajs.dom.*
 
@@ -40,15 +40,15 @@ object Renderer {
   case class PreviousState(node: Node, elementChild: ElementChild)
   def render(parent: Node, elementChild: ElementChild): Unit = {
     val queue = Subject[() => Unit]()
-    renderInternal(parent, elementChild, None)(queue)
     queue.subscribeNext(_())
+    renderInternal(parent, elementChild, None)(queue)
   }
 
   private def renderInternal(
     parent: Node,
     elementChild: ElementChild,
     previousState: Option[PreviousState] = None
-  )(implicit queue: Queue
+  )(implicit queue: QueueSubscriber
   ): ReturnState = {
     def replaceOrAppendChild[T <: Node](node: T, existing: Option[Node], parent: Node): T = {
       existing match {
@@ -144,7 +144,7 @@ object Renderer {
   }
 
   val ATTRIBUTE_MAPPINGS = Map("className" -> "class")
-  private def handleProperty[Value](element: Element)(p: Property[Value, _])(implicit queue: Queue): Option[Subscription] = {
+  private def handleProperty[Value](element: Element)(p: Property[Value, _])(implicit queue: QueueSubscriber): Option[Subscription] = {
     def setAttribute[Value](key: Name[_, _], value: Value) = value match {
       case ps: Iterable[CssProperty | SelectorProperty] =>
         val className = s"flux-${ps.map(_.toString).hashCode()}"
@@ -168,7 +168,9 @@ object Renderer {
 
     p match {
       case SubscriberProperty(key, subscriber: Subscriber[Value]) =>
-        Some(Observable.fromEventListener(element, key.name).subscribe(subscriber))
+        val value1 = Observable.fromEventListener(element, key.name)
+        val value2 = QueuedOperator(value1, queue)
+        Some(value2.subscribe(subscriber))
       case SimpleProperty(key, value: Value) if key.name == "id"  =>
         element.id = value.toString
         None

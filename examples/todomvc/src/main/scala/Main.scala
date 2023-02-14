@@ -70,6 +70,7 @@ import Action.*
 
   val state = actions
     .fold(INIT_STATE) { case (State(todos, toggleAll, e), action) =>
+      println(action)
       val newTodos     = action match {
         case Add(v)                              => TodoItem(createKey(), false, v) :: todos
         case SetCompletedAll(completed: Boolean) => todos.map(_.copy(completed = completed))
@@ -143,7 +144,6 @@ import Action.*
       )()
     ),
     empty
-//      .dropRepeats()
       .map(v =>
         if (v) EmptyNode
         else
@@ -158,57 +158,55 @@ import Action.*
             label(`for` := "toggle-all")("Mark all as completed"),
             Observable
               .combine(state, selectedFilter)
-              .map {
-                case (state, f) => {
-                  val ts  = state.todos
-                  val tds = f match {
-                    case "All"       => ts
-                    case "Active"    => ts.filterNot(_.completed)
-                    case "Completed" => ts.filter(_.completed)
-                  }
-                  ul(
-                    className := "todo-list"
-                  )(
-                    tds.map(t =>
-                      li(
-                        className := List(
-                          Option.when(t.completed)("completed"),
-                          state.edit.flatMap(k => Option.when(t.key == k)("editing"))
-                        ).flatten.mkString(" ")
-                      )(
-                        div(className := "view")(
-                          input(
-                            className := "toggle",
-                            `type`    := "checkbox",
-                            checked   := t.completed,
-                            onchange  := actions.preProcess(_.mapTo(t.key).map(Toggle.apply))
-                          )(),
-                          label(ondblclick := actions.preProcess(_.mapTo(Edit(t.key))))(s"${t.label}"),
-                          button(className := "destroy", onclick := actions.preProcess(_.mapTo(t.key).map(Destroy.apply)))("")
-                        ),
-                        input(
-                          className := "edit",
-                          value     := t.label,
-                          onkeyup   := actions.preProcess(
-                            _.filter(_.key == "Enter")
-                              .map(_.target.asInstanceOf[HTMLInputElement])
-                              .map(e => {
-                                val trim = e.value.trim
-                                if (trim == "") Destroy(t.key) else Save(t.key, trim)
-                              })
-                          ),
-                          onblur    := actions.preProcess(
-                              .map(_.target.asInstanceOf[HTMLInputElement])
-                              .map(e => {
-                                val trim = e.value.trim
-                                if (trim == "") Destroy(t.key) else Save(t.key, trim)
-                              })
-                          )
-                        )()
-                      )
-                    ): _*
-                  )
+              .map { case (state, f) =>
+                val ts  = state.todos
+                val tds = f match {
+                  case "All"       => ts
+                  case "Active"    => ts.filterNot(_.completed)
+                  case "Completed" => ts.filter(_.completed)
                 }
+                ul(
+                  className := "todo-list"
+                )(
+                  tds.map(t =>
+                    li(
+                      className := List(
+                        Option.when(t.completed)("completed"),
+                        state.edit.flatMap(k => Option.when(t.key == k)("editing"))
+                      ).flatten.mkString(" ")
+                    )(
+                      div(className := "view")(
+                        input(
+                          className := "toggle",
+                          `type`    := "checkbox",
+                          checked   := t.completed,
+                          onchange  := actions.preProcess(_.mapTo(t.key).map(Toggle.apply))
+                        )(),
+                        label(ondblclick := actions.preProcess(_.mapTo(Edit(t.key))))(s"${t.label}"),
+                        button(className := "destroy", onclick := actions.preProcess(_.mapTo(t.key).map(Destroy.apply)))("")
+                      ),
+                      input(
+                        className := "edit",
+                        value     := t.label,
+                        onkeyup   := actions.preProcess(
+                          _.filter(_.key == "Enter")
+                            .map(_.target.asInstanceOf[HTMLInputElement])
+                            .map(e => {
+                              val trim = e.value.trim
+                              if (trim == "") Destroy(t.key) else Save(t.key, trim)
+                            })
+                        ),
+                        onblur    := actions.preProcess(
+                          _.map(_.target.asInstanceOf[HTMLInputElement])
+                            .map(e => {
+                              val trim = e.value.trim
+                              if (trim == "") Destroy(t.key) else Save(t.key, trim)
+                            })
+                        )
+                      )()
+                    )
+                  ): _*
+                )
               }
           )
       ),

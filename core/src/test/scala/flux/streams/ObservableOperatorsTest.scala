@@ -31,4 +31,30 @@ class ObservableOperatorsTest extends TestBase {
     queue.subscribeNext(_())
     check(queued, List(1, 2, 3))
   }
+  test("queue2") {
+    var l          = scala.collection.mutable.ArrayBuffer.empty[String]
+    val o          = Subject[Int]()
+    val queue      = Subject[() => Unit]()
+    val queued     = QueuedOperator(o, queue)
+    queue.subscribe(new Subscriber[() => Unit] {
+      var added                                = false
+      override def onNext(t: () => Unit): Unit = {
+        l += "start"
+        t()
+        if (!added) {
+          added = true
+          o.onNext(4)
+        }
+        l += "end"
+      }
+
+      override def onCompleted: Unit = {}
+    })
+    val subscriber = ListSubscriber[Int]()
+    queued.subscribe(subscriber)
+    List(1, 2).foreach(o.onNext)
+    subscriber.items shouldBe List(1, 4, 2)
+    l.toSeq shouldBe Seq("start", "end", "start", "end", "start", "end")
+  }
+
 }
