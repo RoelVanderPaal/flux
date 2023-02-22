@@ -1,6 +1,6 @@
 package flux
 import flux.streams.{Observable, Subscriber}
-import org.scalajs.dom.{Event, FocusEvent, KeyboardEvent, MouseEvent}
+import org.scalajs.dom.*
 
 import scala.language.implicitConversions
 
@@ -16,6 +16,9 @@ package object web {
   private trait ElementScope           extends Scope
   private trait HTMLElementScope       extends Scope
   private trait HTMLButtonElementScope extends Scope
+  private trait HTMLInputElementScope  extends Scope
+
+  type InputScope = ElementScope | HTMLElementScope | HTMLInputElementScope
 
   sealed private trait Property[Value, +Scope] {
     def key: Name[Value, Scope]
@@ -31,7 +34,13 @@ package object web {
       }
     }
   }
-  private case class SimpleProperty[Value, Scope](key: Name[Value, Scope], value: Value) extends Property[Value, Scope]
+
+  private trait Scope2[T]
+  private trait HTMLInputElementScope2 extends Scope2[HTMLInputElement]
+
+  private case class WithRefProperty[T, Scope2[T]](f: T => Unit)
+
+  private case class SimpleProperty[Value, Scope](key: Name[Value, Scope], value: Value)                 extends Property[Value, Scope]
   private case class ObservableProperty[Value, Scope](key: Name[Value, Scope], value: Observable[Value]) extends Property[Value, Scope]
   private case class SubscriberProperty[Value <: Event, Scope](key: Name[Value, Scope], value: Subscriber[Value])
       extends Property[Value, Scope]
@@ -85,7 +94,7 @@ package object web {
   case object header  extends ElementModelFactory[ElementScope | HTMLElementScope]("header")
   case object footer  extends ElementModelFactory[ElementScope | HTMLElementScope]("footer")
   case object h1      extends ElementModelFactory[ElementScope | HTMLElementScope]("h1")
-  case object input   extends ElementModelFactory[ElementScope | HTMLElementScope]("input")
+  case object input   extends ElementModelFactory[InputScope]("input")
   case object label   extends ElementModelFactory[ElementScope | HTMLElementScope]("label")
   case object span    extends ElementModelFactory[ElementScope | HTMLElementScope]("span")
   case object strong  extends ElementModelFactory[ElementScope | HTMLElementScope]("strong")
@@ -94,7 +103,7 @@ package object web {
   case object a       extends ElementModelFactory[ElementScope | HTMLElementScope]("a")
   case object button  extends ElementModelFactory[ElementScope | HTMLElementScope | HTMLButtonElementScope]("button")
 
-  case object disabled    extends WritableName[Boolean, HTMLButtonElementScope]
+  case object disabled    extends WritableName[Boolean, HTMLButtonElementScope & HTMLInputElementScope]
   case object checked     extends WritableName[Boolean, HTMLElementScope]
   case object autofocus   extends WritableName[Boolean, HTMLElementScope]
   case object className   extends WritableName[String, ElementScope]

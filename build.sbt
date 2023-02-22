@@ -7,7 +7,7 @@ lazy val core = project
   .settings(
     scalacOptions ++= Seq("-deprecation", "-feature", "-language:implicitConversions"),
     libraryDependencies ++= Seq(
-      "org.scala-js"  %%% "scalajs-dom" % "2.3.0",
+      "org.scala-js"  %%% "scalajs-dom" % "2.4.0",
       "org.scalatest" %%% "scalatest"   % "3.2.15" % Test
     ),
     jsEnv := new org.scalajs.jsenv.jsdomnodejs.JSDOMNodeJSEnv()
