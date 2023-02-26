@@ -70,7 +70,6 @@ import Action.*
 
   val state = actions
     .fold(INIT_STATE) { case (State(todos, toggleAll, e), action) =>
-      println(action)
       val newTodos     = action match {
         case Add(v)                              => TodoItem(createKey(), false, v) :: todos
         case SetCompletedAll(completed: Boolean) => todos.map(_.copy(completed = completed))

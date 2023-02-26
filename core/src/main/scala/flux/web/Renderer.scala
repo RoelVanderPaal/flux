@@ -156,10 +156,9 @@ object Renderer {
       case _                                            =>
         val k = ATTRIBUTE_MAPPINGS.getOrElse(key.name, key.name)
         (k, value) match {
-          case ("checked", b: Boolean) => element.asInstanceOf[HTMLInputElement].checked = b
-          case _                       =>
+          case _ =>
             value match {
-              case b: Boolean =>
+              case b: Boolean => if (b) element.setAttribute(k, "") else element.removeAttribute(k)
               case v          => element.setAttribute(k, v.toString)
             }
         }

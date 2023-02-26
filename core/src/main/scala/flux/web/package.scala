@@ -18,8 +18,6 @@ package object web {
   private trait HTMLButtonElementScope extends Scope
   private trait HTMLInputElementScope  extends Scope
 
-  type InputScope = ElementScope | HTMLElementScope | HTMLInputElementScope
-
   sealed private trait Property[Value, +Scope] {
     def key: Name[Value, Scope]
   }
@@ -28,25 +26,27 @@ package object web {
     def unsafeObservable[Value](key: String, v: Observable[Value]) = ObservableProperty(createName(key), v)
     def unsafeSubscriber[Value](key: String, v: Subscriber[Value]) = SubscriberProperty(createName(key), v)
 
-    private def createName[Value](key: String) = {
+    def createName[Value](key: String) = {
       new Name[Value, ElementScope] {
         override def name: String = key
       }
     }
   }
 
-  private trait Scope2[T]
-  private trait HTMLInputElementScope2 extends Scope2[HTMLInputElement]
-
-  private case class WithRefProperty[T, Scope2[T]](f: T => Unit)
-
+  // TODO get rid of name, just use String
+  // TODO get rid of Value
   private case class SimpleProperty[Value, Scope](key: Name[Value, Scope], value: Value)                 extends Property[Value, Scope]
+  // TODO merge with SimpleProperty
   private case class ObservableProperty[Value, Scope](key: Name[Value, Scope], value: Observable[Value]) extends Property[Value, Scope]
   private case class SubscriberProperty[Value <: Event, Scope](key: Name[Value, Scope], value: Subscriber[Value])
       extends Property[Value, Scope]
+  private case class RefProperty[Value <: Element](value: Subscriber[Value]) extends Property[Value, ElementScope] {
+    override def key: Name[Value, ElementScope] = Property.createName("ref")
+  }
+  case class Ref[Value <: Element](value: Subscriber[Value])
 
   sealed private trait Name[Value, +Scope] {
-    def name: String
+    def name: String // TODO should be removed, and only kept where it makes sense
   }
 
   private trait WritableName[Value, Scope] extends Name[Value, Scope] {
@@ -61,6 +61,9 @@ package object web {
 
     override def name: String = this.toString.stripPrefix("on")
   }
+  private trait MethodName[Value, Scope]         extends Name[Value, Scope] {
+    override def name: String = this.toString
+  }
 
   object ElementModel {
     def unsafe(name: String, properties: Seq[Property[_, _]], children: Iterable[ElementChild]) = ElementModel(name, properties, children)
@@ -70,10 +73,16 @@ package object web {
     def apply(children: ElementChild*): ElementModel = ElementModel(name, properties, children)
   }
 
-  trait ElementModelFactory[Scope](name: String) {
-    def apply(children: ElementChild*): ElementModel = ElementModel(name, List.empty[Property[_, Scope]], children)
+  private trait ElementModelFactory[S <: Scope, T <: Element](name: String) {
+    def apply(children: ElementChild*): ElementModel = ElementModel(name, List.empty[Property[_, S]], children)
 
-    def apply(properties: Property[_, Scope]*) = new ElementModelFactoryWithoutChildren(name, properties)
+    def apply(properties: Property[_, S]*) = new ElementModelFactoryWithoutChildren(
+      name,
+      properties.map {
+        case p: Property[_, _] => p
+        case r: Ref[_]         => RefProperty(r.value)
+      }
+    )
   }
 
   private case class CssProperty(key: CssName, value: String)
@@ -89,22 +98,28 @@ package object web {
     def :=(value: Iterable[CssProperty]) = SelectorProperty(this, value)
   }
 
-  case object div     extends ElementModelFactory[ElementScope | HTMLElementScope]("div")
-  case object section extends ElementModelFactory[ElementScope | HTMLElementScope]("section")
-  case object header  extends ElementModelFactory[ElementScope | HTMLElementScope]("header")
-  case object footer  extends ElementModelFactory[ElementScope | HTMLElementScope]("footer")
-  case object h1      extends ElementModelFactory[ElementScope | HTMLElementScope]("h1")
-  case object input   extends ElementModelFactory[InputScope]("input")
-  case object label   extends ElementModelFactory[ElementScope | HTMLElementScope]("label")
-  case object span    extends ElementModelFactory[ElementScope | HTMLElementScope]("span")
-  case object strong  extends ElementModelFactory[ElementScope | HTMLElementScope]("strong")
-  case object ul      extends ElementModelFactory[ElementScope | HTMLElementScope]("ul")
-  case object li      extends ElementModelFactory[ElementScope | HTMLElementScope]("li")
-  case object a       extends ElementModelFactory[ElementScope | HTMLElementScope]("a")
-  case object button  extends ElementModelFactory[ElementScope | HTMLElementScope | HTMLButtonElementScope]("button")
+  abstract private class ElementFactory(name: String) extends ElementModelFactory[ElementScope | HTMLElementScope, HTMLElement](name)
+  abstract private class InputElementFactory(name: String)
+      extends ElementModelFactory[ElementScope | HTMLElementScope | HTMLInputElementScope, HTMLInputElement](name)
+  abstract private class ButtonElementFactory(name: String)
+      extends ElementModelFactory[ElementScope | HTMLElementScope | HTMLButtonElementScope, HTMLButtonElement](name)
+
+  case object div     extends ElementFactory("div")
+  case object section extends ElementFactory("section")
+  case object header  extends ElementFactory("header")
+  case object footer  extends ElementFactory("footer")
+  case object h1      extends ElementFactory("h1")
+  case object label   extends ElementFactory("label")
+  case object span    extends ElementFactory("span")
+  case object strong  extends ElementFactory("strong")
+  case object ul      extends ElementFactory("ul")
+  case object li      extends ElementFactory("li")
+  case object a       extends ElementFactory("a")
+  case object input   extends InputElementFactory("input")
+  case object button  extends ButtonElementFactory("button")
 
   case object disabled    extends WritableName[Boolean, HTMLButtonElementScope & HTMLInputElementScope]
-  case object checked     extends WritableName[Boolean, HTMLElementScope]
+  case object checked     extends WritableName[Boolean, HTMLInputElementScope]
   case object autofocus   extends WritableName[Boolean, HTMLElementScope]
   case object className   extends WritableName[String, ElementScope]
   case object id          extends WritableName[String, ElementScope]
@@ -120,6 +135,7 @@ package object web {
   case object ondblclick extends EventName[MouseEvent, HTMLElementScope]
   case object onkeyup    extends EventName[KeyboardEvent, HTMLElementScope]
   case object onblur     extends EventName[FocusEvent, HTMLElementScope]
+  case object focus      extends MethodName[Unit, HTMLElementScope]
 
   case object backgroundColor extends CssName("background-color")
 

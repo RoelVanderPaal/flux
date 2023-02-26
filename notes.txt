@@ -18,3 +18,6 @@ checklist:
 - unsafe implemented everywhere?
 
 https://stackoverflow.com/questions/2734025/is-javascript-guaranteed-to-be-single-threaded/2734311#2734311
+
+can input.value be set with observable?
+https://javascript.info/dom-attributes-and-properties
