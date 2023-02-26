@@ -166,7 +166,7 @@ object Renderer {
     }
 
     p match {
-      case SubscriberProperty(key, subscriber: Subscriber[Value]) =>
+      case EventProperty(key, subscriber: Subscriber[Value])      =>
         val value1 = Observable.fromEventListener(element, key)
         val value2 = QueuedOperator(value1, queue)
         Some(value2.subscribe(subscriber))
@@ -176,7 +176,7 @@ object Renderer {
       case AttributeProperty(key, value: Value)                   =>
         setAttribute(key, value)
         None
-      case ObservableProperty(key, o: Observable[Value])          =>
+      case ObservableAttributeProperty(key, o: Observable[Value]) =>
         Some(o.subscribe(new Subscriber[Value] {
           override def onNext(t: Value): Unit = setAttribute(key, t)
 

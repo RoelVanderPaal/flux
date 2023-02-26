@@ -23,16 +23,14 @@ package object web {
   }
   object Property                              {
     def unsafe[Value](key: String, v: Value)                       = AttributeProperty(key, v)
-    def unsafeObservable[Value](key: String, v: Observable[Value]) = ObservableProperty(key, v)
-    def unsafeSubscriber[Value](key: String, v: Subscriber[Value]) = SubscriberProperty(key, v)
+    def unsafeObservable[Value](key: String, v: Observable[Value]) = ObservableAttributeProperty(key, v)
+    def unsafeSubscriber[Value](key: String, v: Subscriber[Value]) = EventProperty(key, v)
 
   }
 
-  // TODO get rid of Value
   private case class AttributeProperty[Value, Scope](key: String, value: Value)                       extends Property[Value, Scope]
-  // TODO merge with SimpleProperty
-  private case class ObservableProperty[Value, Scope](key: String, value: Observable[Value])          extends Property[Value, Scope]
-  private case class SubscriberProperty[Value <: Event, Scope](key: String, value: Subscriber[Value]) extends Property[Value, Scope]
+  private case class ObservableAttributeProperty[Value, Scope](key: String, value: Observable[Value]) extends Property[Value, Scope]
+  private case class EventProperty[Value <: Event, Scope](key: String, value: Subscriber[Value])      extends Property[Value, Scope]
   private case class RefProperty[Value <: Element](value: Subscriber[Value]) extends Property[Value, ElementScope] {
     def key = "ref"
   }
@@ -44,13 +42,13 @@ package object web {
 
   private trait AttributeName[Value, Scope] extends Name[Value, Scope] {
     def :=(value: Value)             = AttributeProperty[Value, Scope](this.name, value)
-    def :=(value: Observable[Value]) = ObservableProperty[Value, Scope](this.name, value)
+    def :=(value: Observable[Value]) = ObservableAttributeProperty[Value, Scope](this.name, value)
 
     override def name: String = this.toString
   }
 
   private trait EventName[Value <: Event, Scope] extends Name[Value, Scope] {
-    def :=(value: Subscriber[Value]) = SubscriberProperty(this.name, value)
+    def :=(value: Subscriber[Value]) = EventProperty(this.name, value)
 
     override def name: String = this.toString.stripPrefix("on")
   }
