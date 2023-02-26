@@ -19,45 +19,38 @@ package object web {
   private trait HTMLInputElementScope  extends Scope
 
   sealed private trait Property[Value, +Scope] {
-    def key: Name[Value, Scope]
+    def key: String
   }
   object Property                              {
-    def unsafe[Value](key: String, v: Value)                       = SimpleProperty(createName(key), v)
-    def unsafeObservable[Value](key: String, v: Observable[Value]) = ObservableProperty(createName(key), v)
-    def unsafeSubscriber[Value](key: String, v: Subscriber[Value]) = SubscriberProperty(createName(key), v)
+    def unsafe[Value](key: String, v: Value)                       = AttributeProperty(key, v)
+    def unsafeObservable[Value](key: String, v: Observable[Value]) = ObservableProperty(key, v)
+    def unsafeSubscriber[Value](key: String, v: Subscriber[Value]) = SubscriberProperty(key, v)
 
-    def createName[Value](key: String) = {
-      new Name[Value, ElementScope] {
-        override def name: String = key
-      }
-    }
   }
 
-  // TODO get rid of name, just use String
   // TODO get rid of Value
-  private case class SimpleProperty[Value, Scope](key: Name[Value, Scope], value: Value)                 extends Property[Value, Scope]
+  private case class AttributeProperty[Value, Scope](key: String, value: Value)                       extends Property[Value, Scope]
   // TODO merge with SimpleProperty
-  private case class ObservableProperty[Value, Scope](key: Name[Value, Scope], value: Observable[Value]) extends Property[Value, Scope]
-  private case class SubscriberProperty[Value <: Event, Scope](key: Name[Value, Scope], value: Subscriber[Value])
-      extends Property[Value, Scope]
+  private case class ObservableProperty[Value, Scope](key: String, value: Observable[Value])          extends Property[Value, Scope]
+  private case class SubscriberProperty[Value <: Event, Scope](key: String, value: Subscriber[Value]) extends Property[Value, Scope]
   private case class RefProperty[Value <: Element](value: Subscriber[Value]) extends Property[Value, ElementScope] {
-    override def key: Name[Value, ElementScope] = Property.createName("ref")
+    def key = "ref"
   }
   case class Ref[Value <: Element](value: Subscriber[Value])
 
   sealed private trait Name[Value, +Scope] {
-    def name: String // TODO should be removed, and only kept where it makes sense
+    def name: String
   }
 
-  private trait WritableName[Value, Scope] extends Name[Value, Scope] {
-    def :=(value: Value)             = SimpleProperty[Value, Scope](this, value)
-    def :=(value: Observable[Value]) = ObservableProperty[Value, Scope](this, value)
+  private trait AttributeName[Value, Scope] extends Name[Value, Scope] {
+    def :=(value: Value)             = AttributeProperty[Value, Scope](this.name, value)
+    def :=(value: Observable[Value]) = ObservableProperty[Value, Scope](this.name, value)
 
     override def name: String = this.toString
   }
 
   private trait EventName[Value <: Event, Scope] extends Name[Value, Scope] {
-    def :=(value: Subscriber[Value]) = SubscriberProperty(this, value)
+    def :=(value: Subscriber[Value]) = SubscriberProperty(this.name, value)
 
     override def name: String = this.toString.stripPrefix("on")
   }
@@ -76,7 +69,7 @@ package object web {
   private trait ElementModelFactory[S <: Scope, T <: Element](name: String) {
     def apply(children: ElementChild*): ElementModel = ElementModel(name, List.empty[Property[_, S]], children)
 
-    def apply(properties: Property[_, S]*) = new ElementModelFactoryWithoutChildren(
+    def apply(properties: (Property[_, S] | Ref[T])*) = new ElementModelFactoryWithoutChildren(
       name,
       properties.map {
         case p: Property[_, _] => p
@@ -118,17 +111,17 @@ package object web {
   case object input   extends InputElementFactory("input")
   case object button  extends ButtonElementFactory("button")
 
-  case object disabled    extends WritableName[Boolean, HTMLButtonElementScope & HTMLInputElementScope]
-  case object checked     extends WritableName[Boolean, HTMLInputElementScope]
-  case object autofocus   extends WritableName[Boolean, HTMLElementScope]
-  case object className   extends WritableName[String, ElementScope]
-  case object id          extends WritableName[String, ElementScope]
-  case object `for`       extends WritableName[String, ElementScope]
-  case object href        extends WritableName[String, ElementScope]
-  case object placeholder extends WritableName[String, ElementScope]
-  case object `type`      extends WritableName[String, ElementScope]
-  case object value       extends WritableName[String, ElementScope]
-  case object classStyle  extends WritableName[Iterable[CssProperty | SelectorProperty], HTMLElementScope]
+  case object disabled    extends AttributeName[Boolean, HTMLButtonElementScope & HTMLInputElementScope]
+  case object checked     extends AttributeName[Boolean, HTMLInputElementScope]
+  case object autofocus   extends AttributeName[Boolean, HTMLElementScope]
+  case object className   extends AttributeName[String, ElementScope]
+  case object id          extends AttributeName[String, ElementScope]
+  case object `for`       extends AttributeName[String, ElementScope]
+  case object href        extends AttributeName[String, ElementScope]
+  case object placeholder extends AttributeName[String, ElementScope]
+  case object `type`      extends AttributeName[String, ElementScope]
+  case object value       extends AttributeName[String, ElementScope]
+  case object classStyle  extends AttributeName[Iterable[CssProperty | SelectorProperty], HTMLElementScope]
 
   case object onchange   extends EventName[MouseEvent, HTMLElementScope]
   case object onclick    extends EventName[MouseEvent, HTMLElementScope]

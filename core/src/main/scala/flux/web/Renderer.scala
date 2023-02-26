@@ -99,7 +99,7 @@ object Renderer {
         // properties
         val propertySubscriptions = properties.toSet.diff(previousProperties.toSet).flatMap(handleProperty(element))
         // remove previous properties
-        previousProperties.map(_.key.name).toSet.diff(properties.map(_.key.name).toSet).foreach(element.removeAttribute)
+        previousProperties.map(_.key).toSet.diff(properties.map(_.key).toSet).foreach(element.removeAttribute)
 
         ReturnState(NodeHolder(element), SubscriptionsHolder(childSubscriptions ++ propertySubscriptions))
       case o: Observable[ElementChild]              =>
@@ -145,7 +145,7 @@ object Renderer {
 
   val ATTRIBUTE_MAPPINGS = Map("className" -> "class")
   private def handleProperty[Value](element: Element)(p: Property[Value, _])(implicit queue: QueueSubscriber): Option[Subscription] = {
-    def setAttribute[Value](key: Name[_, _], value: Value) = value match {
+    def setAttribute[Value](key: String, value: Value) = value match {
       case ps: Iterable[CssProperty | SelectorProperty] =>
         val className = s"flux-${ps.map(_.toString).hashCode()}"
         if (!classNames.contains(className)) {
@@ -154,7 +154,7 @@ object Renderer {
         }
         element.setAttribute("class", className)
       case _                                            =>
-        val k = ATTRIBUTE_MAPPINGS.getOrElse(key.name, key.name)
+        val k = ATTRIBUTE_MAPPINGS.getOrElse(key, key)
         (k, value) match {
           case _ =>
             value match {
@@ -167,13 +167,13 @@ object Renderer {
 
     p match {
       case SubscriberProperty(key, subscriber: Subscriber[Value]) =>
-        val value1 = Observable.fromEventListener(element, key.name)
+        val value1 = Observable.fromEventListener(element, key)
         val value2 = QueuedOperator(value1, queue)
         Some(value2.subscribe(subscriber))
-      case SimpleProperty(key, value: Value) if key.name == "id"  =>
+      case AttributeProperty(key, value: Value) if key == "id"    =>
         element.id = value.toString
         None
-      case SimpleProperty(key, value: Value)                      =>
+      case AttributeProperty(key, value: Value)                   =>
         setAttribute(key, value)
         None
       case ObservableProperty(key, o: Observable[Value])          =>
@@ -188,7 +188,7 @@ object Renderer {
   private def cssProperties2String(className: String, properties: Iterable[CssProperty | SelectorProperty]): String = {
     val body         = properties
       .collect { case p: CssProperty => p }
-      .map(p => s"${p.key.name}:${p.value}")
+      .map(p => s"${p.key}:${p.value}")
       .toList
       .sorted
       .mkString(";")
