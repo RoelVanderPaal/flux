@@ -12,6 +12,9 @@ object Renderer {
     def node          = nodeHolder.node
     def subscriptions = subscriptionsHolder.subscriptions
   }
+  case class LatestElementChildHolder()                                                    {
+    var latest = Option.empty[ElementChild]
+  }
   case class NodeHolder()                                                                  {
     var node: Node = _
   }
@@ -50,6 +53,52 @@ object Renderer {
     previousState: Option[PreviousState] = None
   )(implicit queue: QueueSubscriber
   ): ReturnState = {
+    val ATTRIBUTE_MAPPINGS = Map("className" -> "class")
+
+    def handleProperty[Value](element: Element)(p: Property[Value, _])(implicit queue: QueueSubscriber): Option[Subscription] = {
+      def setAttribute[Value](key: String, value: Value) = value match {
+        case ps: Iterable[CssProperty | SelectorProperty] =>
+          val className = s"flux-${ps.map(_.toString).hashCode()}"
+          if (!classNames.contains(className)) {
+            classNames += className
+            addStyleSheet(cssProperties2String(className, ps))
+          }
+          element.setAttribute("class", className)
+        case _                                            =>
+          val k = ATTRIBUTE_MAPPINGS.getOrElse(key, key)
+          (k, value) match {
+            case _ =>
+              value match {
+                case b: Boolean => if (b) element.setAttribute(k, "") else element.removeAttribute(k)
+                case v          => element.setAttribute(k, v.toString)
+              }
+          }
+
+      }
+
+      p match {
+        case EventProperty(key, subscriber: Subscriber[Value])      =>
+          val value1 = Observable.fromEventListener(element, key)
+          val value2 = QueuedOperator(value1, queue)
+          Some(value2.subscribe(subscriber))
+        case AttributeProperty(key, value: Value) if key == "id"    =>
+          element.id = value.toString
+          None
+        case AttributeProperty(key, value: Value)                   =>
+          setAttribute(key, value)
+          None
+        case RefProperty(subscriber: Subscriber[Value])             =>
+          subscriber.onNext(element.asInstanceOf[Value])
+          None
+        case ObservableAttributeProperty(key, o: Observable[Value]) =>
+          Some(o.subscribe(new Subscriber[Value] {
+            override def onNext(t: Value): Unit = setAttribute(key, t)
+
+            override def onCompleted: Unit = {}
+          }))
+      }
+    }
+
     def replaceOrAppendChild[T <: Node](node: T, existing: Option[Node], parent: Node): T = {
       existing match {
         case Some(e) => parent.replaceChild(node, e)
@@ -108,18 +157,19 @@ object Renderer {
           replaceOrAppendChild(comment, None, parent)
           NodeHolder(comment)
         }
+        val latestHolder              = LatestElementChildHolder()
         val parentSubscriptionsHolder = SubscriptionsHolder.empty
         val subscription              = o.subscribe(new Subscriber[ElementChild] {
-          var latest                                 = Option.empty[ElementChild]
-          val r                                      = ReturnState(
+          val r = ReturnState(
             nodeHolder,
             SubscriptionsHolder.empty
           )
+
           override def onNext(t: ElementChild): Unit = {
             r.subscriptions.foreach(_.unsubscribe())
             parentSubscriptionsHolder.subscriptions = parentSubscriptionsHolder.subscriptions.filterNot(r.subscriptions.toList.contains)
-            val renderResult = renderInternal(parent, t, Some(PreviousState(nodeHolder.node, latest.getOrElse("placeholder"))))
-            latest = Some(t)
+            val renderResult = renderInternal(parent, t, Some(PreviousState(nodeHolder.node, latestHolder.latest.getOrElse("placeholder"))))
+            latestHolder.latest = Some(t)
             r.nodeHolder.node = renderResult.nodeHolder.node
             r.subscriptionsHolder.subscriptions = renderResult.subscriptionsHolder.subscriptions
             parentSubscriptionsHolder.subscriptions ++= renderResult.subscriptionsHolder.subscriptions
@@ -141,48 +191,7 @@ object Renderer {
         }
         ReturnState(NodeHolder(node), SubscriptionsHolder.empty)
     }
-  }
 
-  val ATTRIBUTE_MAPPINGS = Map("className" -> "class")
-  private def handleProperty[Value](element: Element)(p: Property[Value, _])(implicit queue: QueueSubscriber): Option[Subscription] = {
-    def setAttribute[Value](key: String, value: Value) = value match {
-      case ps: Iterable[CssProperty | SelectorProperty] =>
-        val className = s"flux-${ps.map(_.toString).hashCode()}"
-        if (!classNames.contains(className)) {
-          classNames += className
-          addStyleSheet(cssProperties2String(className, ps))
-        }
-        element.setAttribute("class", className)
-      case _                                            =>
-        val k = ATTRIBUTE_MAPPINGS.getOrElse(key, key)
-        (k, value) match {
-          case _ =>
-            value match {
-              case b: Boolean => if (b) element.setAttribute(k, "") else element.removeAttribute(k)
-              case v          => element.setAttribute(k, v.toString)
-            }
-        }
-
-    }
-
-    p match {
-      case EventProperty(key, subscriber: Subscriber[Value])      =>
-        val value1 = Observable.fromEventListener(element, key)
-        val value2 = QueuedOperator(value1, queue)
-        Some(value2.subscribe(subscriber))
-      case AttributeProperty(key, value: Value) if key == "id"    =>
-        element.id = value.toString
-        None
-      case AttributeProperty(key, value: Value)                   =>
-        setAttribute(key, value)
-        None
-      case ObservableAttributeProperty(key, o: Observable[Value]) =>
-        Some(o.subscribe(new Subscriber[Value] {
-          override def onNext(t: Value): Unit = setAttribute(key, t)
-
-          override def onCompleted: Unit = {}
-        }))
-    }
   }
 
   private def cssProperties2String(className: String, properties: Iterable[CssProperty | SelectorProperty]): String = {

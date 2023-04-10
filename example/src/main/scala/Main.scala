@@ -5,7 +5,7 @@ import org.scalajs.dom.{document, Event, MouseEvent}
 case class Button(label: String) {
   val clicks = Subject[MouseEvent]()
   val value  = classStyle := Set(_hover := Set(backgroundColor := "green"), CssProperty.unsafe("padding", "10px"))
-  val view   = button(Property.unsafeSubscriber("click", clicks), value, disabled := false)(label)
+  val view   = button(Property.unsafeEvent("click", clicks), value, disabled := false)(label)
 }
 
 case class Display(label: String, o: Observable[Int]) {

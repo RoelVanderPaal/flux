@@ -22,9 +22,9 @@ package object web {
     def key: String
   }
   object Property                              {
-    def unsafe[Value](key: String, v: Value)                       = AttributeProperty(key, v)
-    def unsafeObservable[Value](key: String, v: Observable[Value]) = ObservableAttributeProperty(key, v)
-    def unsafeSubscriber[Value](key: String, v: Subscriber[Value]) = EventProperty(key, v)
+    def unsafeAttribute[Value](key: String, v: Value)                       = AttributeProperty(key, v)
+    def unsafeAttributeObservable[Value](key: String, v: Observable[Value]) = ObservableAttributeProperty(key, v)
+    def unsafeEvent[Value](key: String, v: Subscriber[Value])               = EventProperty(key, v)
 
   }
 
@@ -34,7 +34,7 @@ package object web {
   private case class RefProperty[Value <: Element](value: Subscriber[Value]) extends Property[Value, ElementScope] {
     def key = "ref"
   }
-  case class Ref[Value <: Element](value: Subscriber[Value])
+  case class RefModel[Value <: Element](value: Subscriber[Value])
 
   sealed private trait Name[Value, +Scope] {
     def name: String
@@ -52,9 +52,6 @@ package object web {
 
     override def name: String = this.toString.stripPrefix("on")
   }
-  private trait MethodName[Value, Scope]         extends Name[Value, Scope] {
-    override def name: String = this.toString
-  }
 
   object ElementModel {
     def unsafe(name: String, properties: Seq[Property[_, _]], children: Iterable[ElementChild]) = ElementModel(name, properties, children)
@@ -67,11 +64,11 @@ package object web {
   private trait ElementModelFactory[S <: Scope, T <: Element](name: String) {
     def apply(children: ElementChild*): ElementModel = ElementModel(name, List.empty[Property[_, S]], children)
 
-    def apply(properties: (Property[_, S] | Ref[T])*) = new ElementModelFactoryWithoutChildren(
+    def apply(properties: (Property[_, S] | RefModel[T])*) = new ElementModelFactoryWithoutChildren(
       name,
       properties.map {
         case p: Property[_, _] => p
-        case r: Ref[_]         => RefProperty(r.value)
+        case r: RefModel[_]    => RefProperty(r.value)
       }
     )
   }
@@ -126,7 +123,10 @@ package object web {
   case object ondblclick extends EventName[MouseEvent, HTMLElementScope]
   case object onkeyup    extends EventName[KeyboardEvent, HTMLElementScope]
   case object onblur     extends EventName[FocusEvent, HTMLElementScope]
-  case object focus      extends MethodName[Unit, HTMLElementScope]
+
+  case object ref {
+    def :=[Value <: Element](value: Subscriber[Value]) = RefModel(value)
+  }
 
   case object backgroundColor extends CssName("background-color")
 

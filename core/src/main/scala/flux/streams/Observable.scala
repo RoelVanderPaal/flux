@@ -20,6 +20,7 @@ trait Observable[+T] {
   def drop(n: Int): Observable[T]                                                         = DropOperator(this, n)
   def merge[T2](o2: Observable[T2]): Observable[T | T2]                                   = MergeOperator(Iterable(this, o2))
   def remember(): Observable[T]                                                           = RememberOperator(this)
+  def tap(f: T => Unit): Observable[T]                                                    = TapOperator(this, f)
   def startWith[U >: T](start: U): Observable[U]                                          = StartWithOperator(this, start)
   def combine[T2](o2: Observable[T2]): Observable[(T, T2)]                                = CombineOperator(this, o2)
   def dropRepeats(isEqual: (T, T) => Boolean = (t1: T, t2: T) => t1 == t2): Observable[T] = DropRepeatsOperator(this, isEqual)

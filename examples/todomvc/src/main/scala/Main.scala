@@ -7,6 +7,7 @@ import java.util.UUID
 import scala.scalajs.js
 import scala.scalajs.js.JSON
 import scala.scalajs.js.annotation.JSExportAll
+import scala.scalajs.js.timers.*
 import scala.util.Random
 
 type Key = String
@@ -143,6 +144,7 @@ import Action.*
       )()
     ),
     empty
+      .dropRepeats()
       .map(v =>
         if (v) EmptyNode
         else
@@ -167,7 +169,19 @@ import Action.*
                 ul(
                   className := "todo-list"
                 )(
-                  tds.map(t =>
+                  tds.map(t => {
+                    val inputRef = Subject[HTMLInputElement]()
+                    val edit     = Subject[Event]()
+                    edit.tap(println).mapTo(Edit(t.key)).subscribe(actions)
+                    Observable
+                      .combine(inputRef, edit)
+                      .map(_._1)
+                      .subscribeNext(element => {
+                        setTimeout(0) {
+                          element.focus()
+                        }
+                      })
+
                     li(
                       className := List(
                         Option.when(t.completed)("completed"),
@@ -181,10 +195,11 @@ import Action.*
                           checked   := t.completed,
                           onchange  := actions.preProcess(_.mapTo(t.key).map(Toggle.apply))
                         )(),
-                        label(ondblclick := actions.preProcess(_.mapTo(Edit(t.key))))(s"${t.label}"),
+                        label(ondblclick := edit)(s"${t.label}"),
                         button(className := "destroy", onclick := actions.preProcess(_.mapTo(t.key).map(Destroy.apply)))("")
                       ),
                       input(
+                        ref       := inputRef,
                         className := "edit",
                         value     := t.label,
                         onkeyup   := actions.preProcess(
@@ -204,7 +219,7 @@ import Action.*
                         )
                       )()
                     )
-                  ): _*
+                  }): _*
                 )
               }
           )
