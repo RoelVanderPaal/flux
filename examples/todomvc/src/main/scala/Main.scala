@@ -173,10 +173,19 @@ import Action.*
                     val inputRef = Subject[HTMLInputElement]()
                     val edit     = Subject[Event]()
                     edit.tap(println).mapTo(Edit(t.key)).subscribe(actions)
+
+                    inputRef.subscribeNext(element => {
+                      setTimeout(0) {
+                        println("focus")
+                        element.focus()
+                      }
+                    })
+
                     Observable
                       .combine(inputRef, edit)
                       .map(_._1)
                       .subscribeNext(element => {
+                        println("focus")
                         setTimeout(0) {
                           element.focus()
                         }
