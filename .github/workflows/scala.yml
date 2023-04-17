@@ -33,8 +33,6 @@ jobs:
         java-version: '11'
         distribution: 'temurin'
         cache: 'sbt'
-    - name: Upload dependency graph
-      uses: scalacenter/sbt-dependency-submission@v2
     - name: Run tests
-      run: sbt test
+      run: sbt scalafmtCheck undeclaredCompileDependenciesTest unusedCompileDependenciesTest test
       # Optional: This step uploads information to the GitHub dependency graph and unblocking Dependabot alerts for the repository
