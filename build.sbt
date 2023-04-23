@@ -25,6 +25,18 @@ lazy val core = project
   )
   .dependsOn(streams)
 
+lazy val core_new = project
+  .enablePlugins(ScalaJSPlugin)
+  .settings(
+    scalacOptions ++= Seq("-deprecation", "-feature", "-language:implicitConversions"),
+    libraryDependencies ++= Seq(
+      "org.scala-js"  %%% "scalajs-dom" % "2.4.0",
+      "org.scalatest" %%% "scalatest"   % "3.2.15" % Test
+    ),
+    jsEnv := new org.scalajs.jsenv.jsdomnodejs.JSDOMNodeJSEnv()
+  )
+  .dependsOn(streams)
+
 //lazy val example = project
 //  .enablePlugins(ScalaJSPlugin)
 //  .settings(
@@ -33,10 +45,10 @@ lazy val core = project
 //  )
 //  .dependsOn(core)
 
-//lazy val todomvc = (project in file("examples/todomvc"))
-//  .enablePlugins(ScalaJSPlugin)
-//  .settings(
-//    scalaJSUseMainModuleInitializer := true,
-//    scalacOptions ++= Seq("-deprecation", "-feature", "-language:implicitConversions")
-//  )
-//  .dependsOn(core)
+lazy val todomvc = (project in file("examples/todomvc"))
+  .enablePlugins(ScalaJSPlugin)
+  .settings(
+    scalaJSUseMainModuleInitializer := true,
+    scalacOptions ++= Seq("-deprecation", "-feature", "-language:implicitConversions")
+  )
+  .dependsOn(core_new)

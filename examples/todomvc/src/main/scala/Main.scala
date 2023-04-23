@@ -129,6 +129,8 @@ import Action.*
     .merge(filters.map(_.output): _*)
     .startWith("All")
     .subscribe(selectedFilter)
+  val inputRef       = Subject[HTMLElement]()
+  inputRef.subscribeNext(_.focus())
 
   val app = section(className := "todoapp")(
     header(className := "header")(
@@ -137,6 +139,7 @@ import Action.*
         className   := "new-todo",
         placeholder := "What needs to be done?",
         autofocus   := true,
+        ref         := ((_: HTMLElement).focus()),
         onkeyup     := enterPresseds.preProcess(
           _.filter(_.key == "Enter")
             .map(_.target.asInstanceOf[HTMLInputElement])
@@ -144,7 +147,6 @@ import Action.*
       )()
     ),
     empty
-      .dropRepeats()
       .map(v =>
         if (v) EmptyNode
         else
@@ -159,8 +161,8 @@ import Action.*
             label(`for` := "toggle-all")("Mark all as completed"),
             Observable
               .combine(state, selectedFilter)
-              .map { case (state, f) =>
-                val ts  = state.todos
+              .map { case (s, f) =>
+                val ts  = s.todos
                 val tds = f match {
                   case "All"       => ts
                   case "Active"    => ts.filterNot(_.completed)
@@ -170,31 +172,13 @@ import Action.*
                   className := "todo-list"
                 )(
                   tds.map(t => {
-                    val inputRef = Subject[HTMLInputElement]()
-                    val edit     = Subject[Event]()
-                    edit.tap(println).mapTo(Edit(t.key)).subscribe(actions)
-
-                    inputRef.subscribeNext(element => {
-                      setTimeout(0) {
-                        println("focus")
-                        element.focus()
-                      }
-                    })
-
-                    Observable
-                      .combine(inputRef, edit)
-                      .map(_._1)
-                      .subscribeNext(element => {
-                        println("focus")
-                        setTimeout(0) {
-                          element.focus()
-                        }
-                      })
+                    val edit = Subject[Event]()
+                    edit.mapTo(Edit(t.key)).subscribe(actions)
 
                     li(
                       className := List(
                         Option.when(t.completed)("completed"),
-                        state.edit.flatMap(k => Option.when(t.key == k)("editing"))
+                        s.edit.flatMap(k => Option.when(t.key == k)("editing"))
                       ).flatten.mkString(" ")
                     )(
                       div(className := "view")(
@@ -208,7 +192,12 @@ import Action.*
                         button(className := "destroy", onclick := actions.preProcess(_.mapTo(t.key).map(Destroy.apply)))("")
                       ),
                       input(
-                        ref       := inputRef,
+                        ref       := ((element: HTMLElement) => {
+                          if (s.edit.contains(t.key)) {
+                            println("focus")
+                            element.focus()
+                          }
+                        }),
                         className := "edit",
                         value     := t.label,
                         onkeyup   := actions.preProcess(
@@ -219,34 +208,35 @@ import Action.*
                               if (trim == "") Destroy(t.key) else Save(t.key, trim)
                             })
                         ),
-                        onblur    := actions.preProcess(
-                          _.map(_.target.asInstanceOf[HTMLInputElement])
-                            .map(e => {
-                              val trim = e.value.trim
-                              if (trim == "") Destroy(t.key) else Save(t.key, trim)
-                            })
-                        )
+//                        onblur    := actions.preProcess(
+//                          _.map(_.target.asInstanceOf[HTMLInputElement])
+//                            .map(e => {
+//                              println("blur")
+//                              val trim = e.value.trim
+//                              if (trim == "") Destroy(t.key) else Save(t.key, trim)
+//                            })
+//                        )
                       )()
                     )
                   }): _*
                 )
               }
           )
-      ),
-    empty.map(v =>
-      if (v) EmptyNode
-      else
-        footer(className := "footer")(
-          span(className := "todo-count")(strong(todos.map(_.filterNot(_.completed).length).text()), " item left"),
-          ul(className := "filters")(filters.map(_.view): _*),
-          todos
-            .map(_.exists(_.completed))
-            .map(v =>
-              if (v) button(className := "clear-completed", onclick := actions.preProcess(_.mapTo(ClearCompleted)))("Clear completed")
-              else EmptyNode
-            )
-        )
-    )
+      )
+//    empty.map(v =>
+//      if (v) EmptyNode
+//      else
+//        footer(className := "footer")(
+//          span(className := "todo-count")(strong(todos.map(_.filterNot(_.completed).length).text()), " item left"),
+//          ul(className := "filters")(filters.map(_.view): _*),
+//          todos
+//            .map(_.exists(_.completed))
+//            .map(v =>
+//              if (v) button(className := "clear-completed", onclick := actions.preProcess(_.mapTo(ClearCompleted)))("Clear completed")
+//              else EmptyNode
+//            )
+//        )
+//    )
   )
 
   Renderer.render(document.body, app)
