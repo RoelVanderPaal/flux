@@ -17,7 +17,7 @@ object Test extends App {
   val s_event          = Subject[Event]()
   val s_keyboard_event = Subject[KeyboardEvent]()
 
-  button(h, d, ref := ((_: HTMLButtonElement).focus()))()
+  button(h, d)()
   div(h)()
   div(href := s_string, onchange := s_event, onkeydown := s_keyboard_event)(
     input(c, h, h, d)(),

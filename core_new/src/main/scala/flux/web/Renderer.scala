@@ -28,24 +28,39 @@ object Renderer {
 
     elementChild match {
       case ElementModel(name, properties, children) =>
-        val element                 = document.createElement(name)
+        val updates                       = Subject[Element]()
+        val element                       = document.createElement(name)
         replaceOrAppendChild(parent, element, existing)
-        val propertiesSubscriptions = properties.map {
-          case AttributeProperty(name, v)       =>
+        val propertiesSubscriptions       = properties.map {
+          case AttributeProperty(name, v)           =>
             element.setAttribute(name, v.toString)
             None
-          case EventProperty(event, subscriber) =>
-            Some(QueuedOperator(Observable.fromEventListener(element, event), queue).subscribe(subscriber))
-          case RefProperty[Element](f)          =>
-            f(element) match {
-              case s: Subscription =>
-                println("subscription ref")
-                Some(s)
-              case _               => None
-            }
-          case _                                => None
+          case ObservableAttributeProperty(name, o) =>
+            Some(
+              o.map(_.toString)
+                .subscribeNext(str => {
+                  element.setAttribute(name, str)
+                  updates.onNext(element)
+                })
+            )
+          case EventProperty(event, subscriber)     =>
+            val o = Observable.fromEventListener(element, event)
+            Some(o.subscribe(subscriber))
+//            Some(QueuedOperator(o, queue).subscribe(subscriber))
+          case _                                    => None
         }
-        val subscriptions = children.map(renderInternal(element, _, None)).flatMap(_.subscriptions) ++ propertiesSubscriptions.flatten
+        properties.collect { case RefProperty[Element](subscriber) => subscriber.onNext(element) }
+        val onComponentUpdateSubscription = properties.collect { case OnComponentUpdateProperty[Element](subscriber) =>
+          updates.subscribe(subscriber)
+        }
+
+        val subscriptions: Iterable[Subscription] =
+          children
+            .map(renderInternal(element, _, None))
+            .flatMap(_.subscriptions)
+            ++ propertiesSubscriptions.flatten
+            ++ onComponentUpdateSubscription
+        updates.onNext(element)
         Result(element, subscriptions)
       case s: String                                =>
         val text = document.createTextNode(s)

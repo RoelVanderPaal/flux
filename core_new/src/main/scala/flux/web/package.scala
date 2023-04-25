@@ -6,13 +6,14 @@ import org.scalajs.dom.*
 
 package object web {
   trait Property[-T]
-  case class AttributeProperty[T, V](name: String, v: V)                   extends Property[T]
-  case class ObservableAttributeProperty[T, V](v: Observable[V])           extends Property[T]
-  case class RefProperty[T <: Element](f: T => Unit | Subscription)        extends Property[T]
-  case class EventProperty[T, V <: Event](event: String, v: Subscriber[V]) extends Property[T]
+  case class AttributeProperty[T, V](name: String, v: V)                        extends Property[T]
+  case class ObservableAttributeProperty[T, V](name: String, v: Observable[V])  extends Property[T]
+  case class RefProperty[T <: Element](subscriber: Subscriber[T])               extends Property[T]
+  case class OnComponentUpdateProperty[T <: Element](subscriber: Subscriber[T]) extends Property[T]
+  case class EventProperty[T, V <: Event](event: String, v: Subscriber[V])      extends Property[T]
   trait AttributeName[T, V](name: String)       {
     def :=(v: V)             = AttributeProperty[T, V](name, v)
-    def :=(v: Observable[V]) = ObservableAttributeProperty[T, V](v)
+    def :=(v: Observable[V]) = ObservableAttributeProperty[T, V](name, v)
   }
   trait EventName[T, V <: Event](event: String) {
     def :=(v: Subscriber[V]) = EventProperty[T, V](event, v)
@@ -60,9 +61,14 @@ package object web {
 
   case object disabled extends AttributeName[HTMLInputElement | HTMLButtonElement, Boolean]("disabled")
   case object ref {
-    def :=[T <: Element](f: T => Unit | Subscription) = RefProperty[T](f)
+    def :=[T <: Element](s: Subscriber[T]) = RefProperty[T](s)
   }
-  case object onchange extends EventName[HTMLElement, Event]("change")
+
+  case object onComponentUpdate {
+    def :=[T <: Element](s: Subscriber[T]) = OnComponentUpdateProperty[T](s)
+  }
+
+  case object onchange   extends EventName[HTMLElement, Event]("change")
   case object onkeydown  extends EventName[HTMLElement, KeyboardEvent]("keydown")
   case object onclick    extends EventName[HTMLElement, MouseEvent]("click")
   case object ondblclick extends EventName[HTMLElement, MouseEvent]("dblclick")

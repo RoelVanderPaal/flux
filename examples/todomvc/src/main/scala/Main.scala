@@ -104,8 +104,8 @@ import Action.*
     }
     .startWith(INIT_STATE)
     .remember()
-  val todos = state.map(_.todos).remember()
-  val empty = todos.map(_.isEmpty).remember()
+  val todos = state.map(_.todos).dropRepeats().remember()
+  val empty = todos.map(_.isEmpty).dropRepeats().remember()
   todos.subscribe(new Subscriber[List[TodoItem]] {
     override def onNext(t: List[TodoItem]): Unit = {
       import js.JSConverters.*
@@ -129,8 +129,8 @@ import Action.*
     .merge(filters.map(_.output): _*)
     .startWith("All")
     .subscribe(selectedFilter)
-  val inputRef       = Subject[HTMLElement]()
-  inputRef.subscribeNext(_.focus())
+  val newInputRef    = Subject[HTMLElement]()
+  newInputRef.subscribeNext(_.focus())
 
   val app = section(className := "todoapp")(
     header(className := "header")(
@@ -139,7 +139,7 @@ import Action.*
         className   := "new-todo",
         placeholder := "What needs to be done?",
         autofocus   := true,
-        ref         := ((_: HTMLElement).focus()),
+        ref         := newInputRef,
         onkeyup     := enterPresseds.preProcess(
           _.filter(_.key == "Enter")
             .map(_.target.asInstanceOf[HTMLInputElement])
@@ -162,24 +162,36 @@ import Action.*
             Observable
               .combine(state, selectedFilter)
               .map { case (s, f) =>
-                val ts  = s.todos
-                val tds = f match {
+                val ts = s.todos
+                f match {
                   case "All"       => ts
                   case "Active"    => ts.filterNot(_.completed)
                   case "Completed" => ts.filter(_.completed)
                 }
+              }
+              .dropRepeats()
+              .map(todos => {
+
                 ul(
                   className := "todo-list"
                 )(
-                  tds.map(t => {
-                    val edit = Subject[Event]()
-                    edit.mapTo(Edit(t.key)).subscribe(actions)
-
+                  todos.map(t => {
+                    val inputRef        = Subject[HTMLElement]()
+                    val componentUpdate = Subject[HTMLElement]()
+                    inputRef
+                      .combine(componentUpdate)
+                      .combine(state.map(_.edit).filter(_.exists(_ == t.key)))
+                      .subscribeNext(_._1._1.focus())
                     li(
-                      className := List(
-                        Option.when(t.completed)("completed"),
-                        s.edit.flatMap(k => Option.when(t.key == k)("editing"))
-                      ).flatten.mkString(" ")
+                      onComponentUpdate := componentUpdate,
+                      className         := state
+                        .map(_.edit)
+                        .map(edit =>
+                          List(
+                            Option.when(t.completed)("completed"),
+                            edit.map(x => if (x == t.key) "editing" else "")
+                          ).flatten.mkString(" ")
+                        )
                     )(
                       div(className := "view")(
                         input(
@@ -188,16 +200,11 @@ import Action.*
                           checked   := t.completed,
                           onchange  := actions.preProcess(_.mapTo(t.key).map(Toggle.apply))
                         )(),
-                        label(ondblclick := edit)(s"${t.label}"),
+                        label(ondblclick := actions.preProcess(_.mapTo(t.key).map(Edit.apply)))(t.label),
                         button(className := "destroy", onclick := actions.preProcess(_.mapTo(t.key).map(Destroy.apply)))("")
                       ),
                       input(
-                        ref       := ((element: HTMLElement) => {
-                          if (s.edit.contains(t.key)) {
-                            println("focus")
-                            element.focus()
-                          }
-                        }),
+                        ref       := inputRef,
                         className := "edit",
                         value     := t.label,
                         onkeyup   := actions.preProcess(
@@ -208,35 +215,34 @@ import Action.*
                               if (trim == "") Destroy(t.key) else Save(t.key, trim)
                             })
                         ),
-//                        onblur    := actions.preProcess(
-//                          _.map(_.target.asInstanceOf[HTMLInputElement])
-//                            .map(e => {
-//                              println("blur")
-//                              val trim = e.value.trim
-//                              if (trim == "") Destroy(t.key) else Save(t.key, trim)
-//                            })
-//                        )
+                        onblur    := actions.preProcess(
+                          _.map(_.target.asInstanceOf[HTMLInputElement])
+                            .map(e => {
+                              val trim = e.value.trim
+                              if (trim == "") Destroy(t.key) else Save(t.key, trim)
+                            })
+                        )
                       )()
                     )
                   }): _*
                 )
-              }
+              })
           )
-      )
-//    empty.map(v =>
-//      if (v) EmptyNode
-//      else
-//        footer(className := "footer")(
-//          span(className := "todo-count")(strong(todos.map(_.filterNot(_.completed).length).text()), " item left"),
-//          ul(className := "filters")(filters.map(_.view): _*),
-//          todos
-//            .map(_.exists(_.completed))
-//            .map(v =>
-//              if (v) button(className := "clear-completed", onclick := actions.preProcess(_.mapTo(ClearCompleted)))("Clear completed")
-//              else EmptyNode
-//            )
-//        )
-//    )
+      ),
+    empty.map(v =>
+      if (v) EmptyNode
+      else
+        footer(className := "footer")(
+          span(className := "todo-count")(strong(todos.map(_.filterNot(_.completed).length).text()), " item left"),
+          ul(className := "filters")(filters.map(_.view): _*),
+          todos
+            .map(_.exists(_.completed))
+            .map(v =>
+              if (v) button(className := "clear-completed", onclick := actions.preProcess(_.mapTo(ClearCompleted)))("Clear completed")
+              else EmptyNode
+            )
+        )
+    )
   )
 
   Renderer.render(document.body, app)
