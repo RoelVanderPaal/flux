@@ -1,14 +1,16 @@
 ThisBuild / organization := "flux"
 ThisBuild / version      := "0.0.1-SNAPSHOT"
-ThisBuild / scalaVersion := "3.2.2"
+ThisBuild / scalaVersion := "3.3.0"
 
-lazy val streams = project
+val scalajsDomVersion = "2.6.0"
+val scalatestVersion  = "3.2.16"
+lazy val streams      = project
   .enablePlugins(ScalaJSPlugin)
   .settings(
     scalacOptions ++= Seq("-deprecation", "-feature", "-language:implicitConversions"),
     libraryDependencies ++= Seq(
-      "org.scala-js"  %%% "scalajs-dom" % "2.4.0",
-      "org.scalatest" %%% "scalatest"   % "3.2.15" % Test
+      "org.scala-js"  %%% "scalajs-dom" % scalajsDomVersion,
+      "org.scalatest" %%% "scalatest"   % scalatestVersion % Test
     ),
     jsEnv := new org.scalajs.jsenv.jsdomnodejs.JSDOMNodeJSEnv()
   )
@@ -18,8 +20,8 @@ lazy val core = project
   .settings(
     scalacOptions ++= Seq("-deprecation", "-feature", "-language:implicitConversions"),
     libraryDependencies ++= Seq(
-      "org.scala-js"  %%% "scalajs-dom" % "2.4.0",
-      "org.scalatest" %%% "scalatest"   % "3.2.15" % Test
+      "org.scala-js"  %%% "scalajs-dom" % scalajsDomVersion,
+      "org.scalatest" %%% "scalatest"   % scalatestVersion % Test
     ),
     jsEnv := new org.scalajs.jsenv.jsdomnodejs.JSDOMNodeJSEnv()
   )
@@ -30,8 +32,8 @@ lazy val core_new = project
   .settings(
     scalacOptions ++= Seq("-deprecation", "-feature", "-language:implicitConversions"),
     libraryDependencies ++= Seq(
-      "org.scala-js"  %%% "scalajs-dom" % "2.4.0",
-      "org.scalatest" %%% "scalatest"   % "3.2.15" % Test
+      "org.scala-js"  %%% "scalajs-dom" % scalajsDomVersion,
+      "org.scalatest" %%% "scalatest"   % scalatestVersion % Test
     ),
     jsEnv := new org.scalajs.jsenv.jsdomnodejs.JSDOMNodeJSEnv()
   )

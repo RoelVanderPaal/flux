@@ -6,11 +6,11 @@ import org.scalajs.dom.*
 
 package object web {
   trait Property[-T]
-  case class AttributeProperty[T, V](name: String, v: V)                        extends Property[T]
-  case class ObservableAttributeProperty[T, V](name: String, v: Observable[V])  extends Property[T]
-  case class RefProperty[T <: Element](subscriber: Subscriber[T])               extends Property[T]
-  case class OnComponentUpdateProperty[T <: Element](subscriber: Subscriber[T]) extends Property[T]
-  case class EventProperty[T, V <: Event](event: String, v: Subscriber[V])      extends Property[T]
+  case class AttributeProperty[T, V](name: String, value: V)                            extends Property[T]
+  case class ObservableAttributeProperty[T, V](name: String, observable: Observable[V]) extends Property[T]
+  case class RefProperty[T <: Element](subscriber: Subscriber[T])                       extends Property[T]
+  case class OnComponentUpdateProperty[T <: Element](subscriber: Subscriber[T])         extends Property[T]
+  case class EventProperty[T, V <: Event](event: String, v: Subscriber[V])              extends Property[T]
   trait AttributeName[T, V](name: String)       {
     def :=(v: V)             = AttributeProperty[T, V](name, v)
     def :=(v: Observable[V]) = ObservableAttributeProperty[T, V](name, v)

@@ -83,9 +83,13 @@ import Action.*
           }
         case ToggleAll                           => todos.map(_.copy(completed = !toggleAll))
         case Save(key, label)                    =>
-          todos.map {
-            case TodoItem(k, completed, _) if k == key => TodoItem(k, completed, label)
-            case t                                     => t
+          if (label.trim == "") {
+            todos.filterNot(_.key == key)
+          } else {
+            todos.map {
+              case TodoItem(k, completed, _) if k == key => TodoItem(k, completed, label.trim())
+              case t                                     => t
+            }
           }
         case _                                   => todos
       }

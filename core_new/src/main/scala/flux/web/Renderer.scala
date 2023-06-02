@@ -15,14 +15,7 @@ object Renderer {
 
   def renderInternal(parent: Node, elementChild: ElementChild, existing: Option[Node] = None)(implicit queue: QueueSubscriber): Result = {
     def replaceOrAppendChild(parent: Node, node: Node, existing: Option[Node]) = existing match {
-      case Some(e) => {
-//        println(elementChild)
-//        println(parent)
-//        println(e)
-//        println(node)
-//        println()
-        parent.replaceChild(node, e)
-      }
+      case Some(e) => parent.replaceChild(node, e)
       case None    => parent.appendChild(node)
     }
 
@@ -32,22 +25,26 @@ object Renderer {
         val element                       = document.createElement(name)
         replaceOrAppendChild(parent, element, existing)
         val propertiesSubscriptions       = properties.map {
-          case AttributeProperty(name, v)           =>
-            element.setAttribute(name, v.toString)
+          case AttributeProperty(name, value)                =>
+            value match {
+              case b: Boolean => if (b) element.setAttribute(name, "") else element.removeAttribute(name)
+              case v          => element.setAttribute(name, value.toString)
+            }
             None
-          case ObservableAttributeProperty(name, o) =>
+          case ObservableAttributeProperty(name, observable) =>
             Some(
-              o.map(_.toString)
+              observable
+                .map(_.toString)
                 .subscribeNext(str => {
                   element.setAttribute(name, str)
                   updates.onNext(element)
                 })
             )
-          case EventProperty(event, subscriber)     =>
+          case EventProperty(event, subscriber)              =>
             val o = Observable.fromEventListener(element, event)
             Some(o.subscribe(subscriber))
 //            Some(QueuedOperator(o, queue).subscribe(subscriber))
-          case _                                    => None
+          case _                                             => None
         }
         properties.collect { case RefProperty[Element](subscriber) => subscriber.onNext(element) }
         val onComponentUpdateSubscription = properties.collect { case OnComponentUpdateProperty[Element](subscriber) =>
