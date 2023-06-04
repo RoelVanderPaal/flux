@@ -5,8 +5,6 @@ import org.scalajs.dom.*
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
-import org.scalatest.prop.TableDrivenPropertyChecks
-import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class RendererTest extends AnyFunSuite with Matchers with BeforeAndAfterEach {
   def check(childNodes: NodeList[Node], elementChildren: ElementChild*): Unit = {
