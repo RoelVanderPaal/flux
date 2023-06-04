@@ -15,7 +15,10 @@ class RendererTest extends AnyFunSuite with Matchers with BeforeAndAfterEach {
         (node, elementChild) match {
           case (e: Element, ElementModel(name, properties, children)) =>
             e.tagName shouldBe name.toUpperCase
-            val attributes = properties.collect { case AttributeProperty(name, value) => name -> value }.toMap
+            val attributes = properties.collect {
+              case AttributeProperty(name, value: String)           => name -> value
+              case AttributeProperty(name, value: Boolean) if value => name -> ""
+            }.toMap
             attributes should contain theSameElementsAs e.attributes.view.mapValues(_.value)
             check(e.childNodes, children.toSeq: _*)
           case (t: Text, s: String)                                   => t.wholeText shouldBe s
@@ -26,43 +29,27 @@ class RendererTest extends AnyFunSuite with Matchers with BeforeAndAfterEach {
       })
   }
 
-  private val simpleElementModel = div(id := "test")()
+  private def renderAndCheck(element: ElementChild): Unit = {
+    Renderer.render(document.body, element)
+    check(document.body.childNodes, element)
+  }
+
+  private def renderAndCheckObservable(element: NodeModel): Unit = {
+    Renderer.render(document.body, Observable.once(element))
+    check(document.body.childNodes, element)
+  }
+
+  private val simpleElementModel = div(id := "test")(input()())
   private val simpleText         = "text"
-  test("simple ElementModel") {
-    val element = simpleElementModel
-    Renderer.render(document.body, element)
-    check(document.body.childNodes, element)
-  }
-  test("simple String") {
-    val element = simpleText
-    Renderer.render(document.body, element)
-    check(document.body.childNodes, element)
-  }
-  test("simple Empty") {
-    val element = EmptyNode
-    Renderer.render(document.body, element)
-    check(document.body.childNodes, element)
-  }
-  test("nested ElementModel") {
-    val element = div(id := "test")(span()("inner"))
-    Renderer.render(document.body, element)
-    check(document.body.childNodes, element)
-  }
-  test("simple observable ElementModel") {
-    val element = simpleElementModel
-    Renderer.render(document.body, Observable.once(element))
-    check(document.body.childNodes, element)
-  }
-  test("simple observable String") {
-    val element = simpleText
-    Renderer.render(document.body, Observable.once(element))
-    check(document.body.childNodes, element)
-  }
-  test("simple observable Empty") {
-    val element = EmptyNode
-    Renderer.render(document.body, Observable.once(element))
-    check(document.body.childNodes, element)
-  }
+  test("simple ElementModel") { renderAndCheck(simpleElementModel) }
+  test("simple ElementModel boolean true") { renderAndCheck(input(checked := true)()) }
+  test("simple ElementModel boolean false") { renderAndCheck(input(checked := false)()) }
+  test("simple String") { renderAndCheck(simpleText) }
+  test("simple Empty") { renderAndCheck(EmptyNode) }
+  test("nested ElementModel") { renderAndCheck(div(id := "test")(span()("inner"))) }
+  test("simple observable ElementModel") { renderAndCheckObservable(simpleElementModel) }
+  test("simple observable String") { renderAndCheckObservable(simpleText) }
+  test("simple observable Empty") { renderAndCheckObservable(EmptyNode) }
 
   private def createChild(label: String, children: ElementChild*): NodeModel = {
     val actions = Subject[NodeModel]()
