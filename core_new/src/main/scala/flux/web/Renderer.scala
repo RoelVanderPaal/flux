@@ -21,42 +21,35 @@ object Renderer {
 
     elementChild match {
       case ElementModel(name, properties, children) =>
-        val updates                       = Subject[Element]()
-        val element                       = document.createElement(name)
+        val updates                 = Subject[Element]()
+        val element                 = document.createElement(name)
         replaceOrAppendChild(parent, element, existing)
-        val propertiesSubscriptions       = properties.map {
-          case AttributeProperty(name, value)                =>
+        properties.foreach {
+          case AttributeProperty(name, value)   =>
             value match {
               case b: Boolean => if (b) element.setAttribute(name, "") else element.removeAttribute(name)
               case v          => element.setAttribute(name, value.toString)
             }
-            None
-          case ObservableAttributeProperty(name, observable) =>
-            Some(
-              observable
-                .map(_.toString)
-                .subscribeNext(str => {
-                  element.setAttribute(name, str)
-                  updates.onNext(element)
-                })
-            )
-          case EventProperty(event, subscriber)              =>
-            val o = Observable.fromEventListener(element, event)
-            Some(o.subscribe(subscriber))
-//            Some(QueuedOperator(o, queue).subscribe(subscriber))
-          case _                                             => None
+          case RefProperty[Element](subscriber) => subscriber.onNext(element)
+          case _                                =>
         }
-        properties.collect { case RefProperty[Element](subscriber) => subscriber.onNext(element) }
-        val onComponentUpdateSubscription = properties.collect { case OnComponentUpdateProperty[Element](subscriber) =>
-          updates.subscribe(subscriber)
+        val propertiesSubscriptions = properties.collect {
+          case ObservableAttributeProperty(name, observable)  =>
+            observable
+              .map(_.toString)
+              .subscribeNext(str => {
+                element.setAttribute(name, str)
+                updates.onNext(element)
+              })
+          case EventProperty(event, subscriber)               => Observable.fromEventListener(element, event).subscribe(subscriber)
+          case OnComponentUpdateProperty[Element](subscriber) => updates.subscribe(subscriber)
         }
 
         val subscriptions: Iterable[Subscription] =
           children
             .map(renderInternal(element, _, None))
             .flatMap(_.subscriptions)
-            ++ propertiesSubscriptions.flatten
-            ++ onComponentUpdateSubscription
+            ++ propertiesSubscriptions
         updates.onNext(element)
         Result(element, subscriptions)
       case s: String                                =>
