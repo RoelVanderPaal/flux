@@ -21,8 +21,9 @@ package object web {
 
   case object EmptyNode
 
-  type NodeModel    = String | ElementModel[_] | EmptyNode.type
-  type ElementChild = NodeModel | Observable[NodeModel]
+  type NodeModel          = String | ElementModel[_] | EmptyNode.type
+  type SimpleElementChild = NodeModel | Iterable[NodeModel]
+  type ElementChild       = SimpleElementChild | Observable[SimpleElementChild]
 
   case class ElementModel[T <: Element](name: String, properties: Iterable[Property[T]], children: Iterable[ElementChild])
 

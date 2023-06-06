@@ -20,6 +20,10 @@ object Renderer {
     }
 
     elementChild match {
+      case es: Iterable[NodeModel]                  =>
+        parent.childNodes.foreach(parent.removeChild)
+        val results = es.map(e => renderInternal(parent, e, None))
+        Result(parent, results.flatMap(_.subscriptions))
       case ElementModel(name, properties, children) =>
         val updates                 = Subject[Element]()
         val element                 = document.createElement(name)

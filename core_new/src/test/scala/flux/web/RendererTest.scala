@@ -7,6 +7,13 @@ import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 
 class RendererTest extends AnyFunSuite with Matchers with BeforeAndAfterEach {
+  def checkSimpleElementChild(childNodes: NodeList[Node], element: SimpleElementChild): Unit = {
+    element match {
+      case es: Iterable[NodeModel] => check(childNodes, es.toList: _*)
+      case _                       => check(childNodes, element)
+    }
+  }
+
   def check(childNodes: NodeList[Node], elementChildren: ElementChild*): Unit = {
     childNodes.length shouldBe elementChildren.length
     childNodes
@@ -23,20 +30,20 @@ class RendererTest extends AnyFunSuite with Matchers with BeforeAndAfterEach {
             check(e.childNodes, children.toSeq: _*)
           case (t: Text, s: String)                                   => t.wholeText shouldBe s
           case (c: Comment, EmptyNode)                                => c.data shouldBe "rest"
-          case (c: Comment, s: Observable[NodeModel])                 => c.data shouldBe "placeholder"
+          case (c: Comment, _: Observable[Any])                       => c.data shouldBe "placeholder"
           case _                                                      => fail(s"no match $node $elementChild")
         }
       })
   }
 
-  private def renderAndCheck(element: ElementChild): Unit = {
+  private def renderAndCheck(element: SimpleElementChild): Unit = {
     Renderer.render(document.body, element)
-    check(document.body.childNodes, element)
+    checkSimpleElementChild(document.body.childNodes, element)
   }
 
-  private def renderAndCheckObservable(element: NodeModel): Unit = {
+  private def renderAndCheckObservable(element: SimpleElementChild): Unit = {
     Renderer.render(document.body, Observable.once(element))
-    check(document.body.childNodes, element)
+    checkSimpleElementChild(document.body.childNodes, element)
   }
 
   private val simpleElementModel = div(id := "test")(input()())
@@ -46,10 +53,13 @@ class RendererTest extends AnyFunSuite with Matchers with BeforeAndAfterEach {
   test("simple ElementModel boolean false") { renderAndCheck(input(checked := false)()) }
   test("simple String") { renderAndCheck(simpleText) }
   test("simple Empty") { renderAndCheck(EmptyNode) }
+  test("simple list") { renderAndCheck(List(simpleText, simpleElementModel)) }
+
   test("nested ElementModel") { renderAndCheck(div(id := "test")(span()("inner"))) }
   test("simple observable ElementModel") { renderAndCheckObservable(simpleElementModel) }
   test("simple observable String") { renderAndCheckObservable(simpleText) }
   test("simple observable Empty") { renderAndCheckObservable(EmptyNode) }
+  test("simple observable list") { renderAndCheckObservable(List(simpleText, simpleElementModel)) }
 
   private def createChild(label: String, children: ElementChild*): NodeModel = {
     val actions = Subject[NodeModel]()
