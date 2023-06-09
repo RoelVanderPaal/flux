@@ -59,6 +59,7 @@ package object web {
   case object placeholder extends AttributeName[Element, String]("placeholder")
   case object `type`      extends AttributeName[Element, String]("type")
   case object value       extends AttributeName[Element, String]("value")
+  case object listKey     extends AttributeName[Element, String]("listKey")
 
   case object disabled extends AttributeName[HTMLInputElement | HTMLButtonElement, Boolean]("disabled")
   case object ref {

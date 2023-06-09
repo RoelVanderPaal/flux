@@ -7,7 +7,7 @@ import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 
 class RendererTest extends AnyFunSuite with Matchers with BeforeAndAfterEach {
-  def checkSimpleElementChild(childNodes: NodeList[Node], element: SimpleElementChild): Unit = {
+  def checkElementChild(element: ElementChild, childNodes: NodeList[Node] = document.body.childNodes): Unit = {
     element match {
       case es: Iterable[NodeModel] => check(childNodes, es.toList: _*)
       case _                       => check(childNodes, element)
@@ -23,8 +23,8 @@ class RendererTest extends AnyFunSuite with Matchers with BeforeAndAfterEach {
           case (e: Element, ElementModel(name, properties, children)) =>
             e.tagName shouldBe name.toUpperCase
             val attributes = properties.collect {
-              case AttributeProperty(name, value: String)           => name -> value
-              case AttributeProperty(name, value: Boolean) if value => name -> ""
+              case AttributeProperty(name, value: String) if name != "listKey" => name -> value
+              case AttributeProperty(name, value: Boolean) if value            => name -> ""
             }.toMap
             attributes should contain theSameElementsAs e.attributes.view.mapValues(_.value)
             check(e.childNodes, children.toSeq: _*)
@@ -36,17 +36,17 @@ class RendererTest extends AnyFunSuite with Matchers with BeforeAndAfterEach {
       })
   }
 
-  private def renderAndCheck(element: SimpleElementChild): Unit = {
+  private def renderAndCheck(element: ElementChild): Unit = {
     Renderer.render(document.body, element)
-    checkSimpleElementChild(document.body.childNodes, element)
+    checkElementChild(element)
   }
 
   private def renderAndCheckObservable(element: SimpleElementChild): Unit = {
     Renderer.render(document.body, Observable.once(element))
-    checkSimpleElementChild(document.body.childNodes, element)
+    checkElementChild(element)
   }
 
-  private val simpleElementModel = div(id := "test")(input()())
+  private val simpleElementModel = div(id := "test")(input(checked := true)())
   private val simpleText         = "text"
   test("simple ElementModel") { renderAndCheck(simpleElementModel) }
   test("simple ElementModel boolean true") { renderAndCheck(input(checked := true)()) }
@@ -54,12 +54,62 @@ class RendererTest extends AnyFunSuite with Matchers with BeforeAndAfterEach {
   test("simple String") { renderAndCheck(simpleText) }
   test("simple Empty") { renderAndCheck(EmptyNode) }
   test("simple list") { renderAndCheck(List(simpleText, simpleElementModel)) }
+  test("list key") { renderAndCheck(List(simpleText, simpleElementModel)) }
 
   test("nested ElementModel") { renderAndCheck(div(id := "test")(span()("inner"))) }
   test("simple observable ElementModel") { renderAndCheckObservable(simpleElementModel) }
   test("simple observable String") { renderAndCheckObservable(simpleText) }
   test("simple observable Empty") { renderAndCheckObservable(EmptyNode) }
-  test("simple observable list") { renderAndCheckObservable(List(simpleText, simpleElementModel)) }
+  test("simple observable list") {
+    val subject = Subject[SimpleElementChild]()
+    renderAndCheck(subject)
+
+    val element1 = List(div(id := "id1", listKey := "k1")("one"), div(id := "id2", listKey := "k2")("two"))
+    subject.onNext(element1)
+    checkElementChild(element1)
+    val id1      = document.getElementById("id1")
+    val id2      = document.getElementById("id2")
+
+    val element2 = List(div(id := "id1", listKey := "k1")("one"), div(id := "id2", listKey := "k2")("two"), div()())
+    subject.onNext(element2)
+    checkElementChild(element2)
+    val id1b     = document.getElementById("id1")
+    val id2b     = document.getElementById("id2")
+//    id1 shouldBe id2b
+//    id2 shouldBe id1b
+
+//    subject.onNext(element1)
+//    checkElementChild(element1)
+  }
+
+  test("replace String") {
+    val subject = Subject[SimpleElementChild]()
+    renderAndCheck(subject)
+    subject.onNext("test")
+    val c1      = document.body.firstChild
+    checkElementChild("test")
+    subject.onNext("test2")
+    checkElementChild("test2")
+    document.body.firstChild shouldBe c1
+    subject.onNext(simpleElementModel)
+    checkElementChild(simpleElementModel)
+    document.body.firstChild should not be c1
+    subject.onNext("test")
+    checkElementChild("test")
+    document.body.firstChild should not be c1
+  }
+  test("remove attribute") {
+    val subject = Subject[SimpleElementChild]()
+    renderAndCheck(subject)
+    subject.onNext(simpleElementModel)
+    checkElementChild(simpleElementModel)
+    val c1      = document.body.firstChild
+
+    val simpleElementModel2 = div(placeholder := "placeholder")(input(checked := false)())
+    subject.onNext(simpleElementModel2)
+    checkElementChild(simpleElementModel2)
+    document.body.firstChild shouldBe c1
+  }
 
   private def createChild(label: String, children: ElementChild*): NodeModel = {
     val actions = Subject[NodeModel]()
@@ -96,11 +146,10 @@ class RendererTest extends AnyFunSuite with Matchers with BeforeAndAfterEach {
     document.getElementById("emptyNode").asInstanceOf[HTMLButtonElement].click()
     check(document.body.childNodes, createParent(createChild("one", EmptyNode)))
     document.getElementById("one").asInstanceOf[HTMLButtonElement].click()
-    check(document.body.childNodes, createParent(createChild("one")))
+    check(document.body.childNodes, createParent(createChild("one", EmptyNode)))
   }
   test("complex counter") {
     def createCounter(label: String, count: Option[Int] = None): NodeModel = {
-      println(s"createCounter $label $count")
       val counts = Subject[Int]()
       val summed = counts.fold(0)(_ + _).startWith(0).remember()
       div()(
@@ -125,11 +174,20 @@ class RendererTest extends AnyFunSuite with Matchers with BeforeAndAfterEach {
     val inputRef = Subject[HTMLElement]()
     inputRef.subscribeNext(_.focus())
 
+    val subject = Subject[SimpleElementChild]()
+    renderAndCheck(subject)
     val element = div()(input(id := "input", ref := inputRef)())
-    Renderer.render(document.body, Observable.once(element))
+    subject.onNext(element)
     check(document.body.childNodes, element)
     val i       = document.getElementById("input").asInstanceOf[HTMLInputElement]
     document.activeElement shouldBe i
+    i.blur()
+    document.activeElement should not be i
+
+    val element2 = div()(input(id := "input")())
+    subject.onNext(element2)
+    check(document.body.childNodes, element2)
+    document.activeElement should not be document.getElementById("input").asInstanceOf[HTMLInputElement]
   }
 
   // TODO check if not too many event listeners?
