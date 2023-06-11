@@ -25,9 +25,12 @@ class RendererTest extends AnyFunSuite with Matchers with BeforeAndAfterEach {
           case (e: Element, ElementModel(name, properties, children)) =>
             e.tagName shouldBe name.toUpperCase
             val attributes = properties.collect {
-              case AttributeProperty(name, value: String) if name != "key" => name -> value
-              case AttributeProperty(name, value: Boolean) if value        => name -> ""
+              case AttributeProperty(name, value: Boolean) if value                       => name -> ""
+              case AttributeProperty(name, value: Any) if name != "key" && value != false => name -> value
             }.toMap
+//            e match {
+//              case h: HTMLElement => println(h.style.clip)
+//            }
             attributes should contain theSameElementsAs e.attributes.view.mapValues(_.value).filterKeys(!_.startsWith("data-"))
             check(e.childNodes, children.toSeq: _*)
           case (t: Text, s: String)                                   => t.wholeText shouldBe s
@@ -51,6 +54,7 @@ class RendererTest extends AnyFunSuite with Matchers with BeforeAndAfterEach {
   private val simpleElementModel = div(id := "test")(input(checked := true)())
   private val simpleText         = "text"
   test("simple ElementModel") { renderAndCheck(simpleElementModel) }
+  test("simple ElementModel with style") { renderAndCheck(div(style := "color: #369;background-color: green")()) }
   test("simple ElementModel boolean true") { renderAndCheck(input(checked := true)()) }
   test("simple ElementModel boolean false") { renderAndCheck(input(checked := false)()) }
   test("simple String") { renderAndCheck(simpleText) }
