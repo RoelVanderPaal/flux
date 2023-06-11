@@ -46,11 +46,12 @@ lazy val core_new = project
 //    scalacOptions ++= Seq("-deprecation", "-feature", "-language:implicitConversions")
 //  )
 //  .dependsOn(core)
-
+import org.scalajs.linker.interface.ModuleSplitStyle
 lazy val todomvc = (project in file("examples/todomvc"))
   .enablePlugins(ScalaJSPlugin)
   .settings(
     scalaJSUseMainModuleInitializer := true,
-    scalacOptions ++= Seq("-deprecation", "-feature", "-language:implicitConversions")
+    scalacOptions ++= Seq("-deprecation", "-feature", "-language:implicitConversions"),
+    scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.ESModule).withModuleSplitStyle(ModuleSplitStyle.SmallModulesFor(List("todomvc"))) }
   )
   .dependsOn(core_new)
