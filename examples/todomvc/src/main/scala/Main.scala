@@ -3,11 +3,9 @@ import flux.streams.constructor.EventListenerObservable
 import flux.streams.{Observable, RememberSubject, Subject, Subscriber}
 import org.scalajs.dom.*
 
-import java.util.UUID
 import scala.scalajs.js
 import scala.scalajs.js.JSON
 import scala.scalajs.js.annotation.JSExportAll
-import scala.scalajs.js.timers.*
 import scala.util.Random
 
 type Key = String
@@ -29,7 +27,7 @@ enum Action {
   case Add(value: String)
   case SetCompletedAll(completed: Boolean)
   case ClearCompleted
-  case Destroy
+  case Destroy(key: Key)
   case Toggle(key: Key)
   case ToggleAll
   case Edit(key: Key)
@@ -76,7 +74,7 @@ import Action.*
         case Add(v)                              => todos :+ TodoItem(createKey(), false, v)
         case SetCompletedAll(completed: Boolean) => todos.map(_.copy(completed = completed))
         case ClearCompleted                      => todos.filterNot(_.completed)
-        case Destroy                             => e.map(key => todos.filterNot(_.key == key)).getOrElse(todos)
+        case Destroy(key)                        => todos.filterNot(_.key == key)
         case Toggle(key)                         =>
           todos.map {
             case TodoItem(k, completed, title) if k == key => TodoItem(k, !completed, title)
@@ -85,12 +83,17 @@ import Action.*
         case ToggleAll                           => todos.map(_.copy(completed = !toggleAll))
         case Save(title)                         =>
           e.map(key =>
-            todos.map {
-              case TodoItem(k, completed, _) if k == key => TodoItem(k, completed, title)
-              case t                                     => t
+            if (title.trim == "") {
+              todos.filterNot(_.key == key)
+            } else {
+              todos.map {
+                case TodoItem(k, completed, _) if k == key => TodoItem(k, completed, title.trim())
+                case t                                     => t
+              }
             }
           ).getOrElse(todos)
-        case _                                   => todos
+
+        case _ => todos
       }
       val newToggleAll = action match {
         case ToggleAll      => !toggleAll
@@ -105,7 +108,6 @@ import Action.*
       }
       State(newTodos, newToggleAll, newEdit)
     }
-    .tap(println)
     .startWith(INIT_STATE)
     .remember()
   val todos = state.map(_.todos).dropRepeats().remember()
@@ -157,10 +159,10 @@ import Action.*
           section(className := "main")(
             input(
               id        := "toggle-all",
-              checked   := state.map(_.toggleAll),
               className := "toggle-all",
               `type`    := "checkbox",
-              onchange  := actions.preProcess(_.mapTo(ToggleAll))
+              onchange  := actions.preProcess(_.mapTo(ToggleAll)),
+              checked   := state.map(_.toggleAll)
             )(),
             label(`for` := "toggle-all")("Mark all as complete"),
             Observable
@@ -208,7 +210,7 @@ import Action.*
                         label(data := Map("testid" -> "todo-title"), ondblclick := actions.preProcess(_.mapTo(t.key).map(Edit.apply)))(
                           t.title
                         ),
-                        button(className := "destroy", onclick := actions.preProcess(_.mapTo(t.key).map(_ => Destroy)))("")
+                        button(className := "destroy", onclick := actions.preProcess(_.mapTo(t.key).map(Destroy.apply)))("")
                       ),
                       input(
                         ref       := inputRef,
@@ -218,17 +220,13 @@ import Action.*
                         onkeyup   := actions.preProcess(
                           _.filter(_.key == "Enter")
                             .map(_.target.asInstanceOf[HTMLInputElement])
-                            .map(e => {
-                              val trim = e.value.trim
-                              if (trim == "") Destroy else Save(trim)
-                            })
+                            .map(_.value)
+                            .map(Save.apply)
                         ),
                         onblur    := actions.preProcess(
                           _.map(_.target.asInstanceOf[HTMLInputElement])
-                            .map(e => {
-                              val trim = e.value.trim
-                              if (trim == "") Destroy else Save(trim)
-                            })
+                            .map(_.value)
+                            .map(Save.apply)
                         )
                       )()
                     )
