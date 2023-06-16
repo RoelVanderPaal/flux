@@ -1,2 +1,5 @@
 target
 node_modules
+playwright-report
+dist
+test-results

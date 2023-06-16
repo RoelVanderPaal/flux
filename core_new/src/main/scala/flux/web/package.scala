@@ -10,6 +10,7 @@ package object web {
   case class ObservableAttributeProperty[T, V](name: String, observable: Observable[V]) extends Property[T]
   case class RefProperty[T <: Element](subscriber: Subscriber[T])                       extends Property[T]
   case class KeyProperty[T <: Element, V](value: V)                                     extends Property[T]
+  case class DataProperty[T <: Element](m: Map[String, String])                         extends Property[T]
   case class OnComponentUpdateProperty[T <: Element](subscriber: Subscriber[T])         extends Property[T]
   case class EventProperty[T, V <: Event](event: String, v: Subscriber[V])              extends Property[T]
   trait AttributeName[T, V](name: String)       {
@@ -61,6 +62,7 @@ package object web {
   case object `type`      extends AttributeName[Element, String]("type")
   case object value       extends AttributeName[Element, String]("value")
   case object style       extends AttributeName[Element, String]("style")
+  case object ariaLabel   extends AttributeName[Element, String]("aria-label")
 
   case object disabled extends AttributeName[HTMLInputElement | HTMLButtonElement, Boolean]("disabled")
   case object ref {
@@ -68,6 +70,10 @@ package object web {
   }
   case object key {
     def :=[T <: Element, V](value: V) = KeyProperty[T, V](value)
+  }
+
+  case object data {
+    def :=[T <: Element](m: Map[String, String]) = DataProperty[T](m)
   }
 
   case object onComponentUpdate {

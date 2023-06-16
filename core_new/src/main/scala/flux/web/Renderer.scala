@@ -4,16 +4,75 @@ import flux.streams.operators.{QueueSubscriber, QueuedOperator}
 import flux.streams.{Observable, Subject, Subscriber, Subscription}
 import org.scalajs.dom.*
 
+import scala.reflect.ClassTag
+
 object Renderer {
-  def render(parent: Node, elementChild: ElementChild): Unit = {
-    val queue = Subject[() => Unit]()
-    queue.subscribeNext(_())
-    renderInternal(parent, elementChild)(queue)
+  def render[T <: ElementChild](parent: Node, elementChild: T)(implicit ev: ClassTag[T]): Unit = {
+    renderInternal(parent, elementChild)
   }
 
   case class Result(node: Node, subscriptions: Iterable[Subscription] = Nil)
+  case class ManyResult(nodes: Iterable[Node], subscriptions: Iterable[Subscription] = Nil)
 
-  def renderInternal(parent: Node, elementChild: ElementChild, existing: Option[Node] = None)(implicit queue: QueueSubscriber): Result = {
+  case class NodeWithKey(node: Node, key: Option[String])
+  def renderInternalMany(
+    parent: Node,
+    elementChilds: Iterable[NodeModel],
+    existing: Iterable[Node]
+  ) = {
+    val nodeWithKeys              = existing.map(node =>
+      NodeWithKey(
+        node,
+        node match {
+          case h: HTMLElement => h.dataset.get(DATA_KEY_NAME)
+          case _              => None
+        }
+      )
+    )
+    val (nodeWithKeysRest, nodes) = elementChilds.foldLeft((nodeWithKeys, List.empty[Option[Node]])) { case ((nodeWithKeys, l), e) =>
+      nodeWithKeys match {
+        case nodeWithKey :: rest =>
+          val elementKey = e match {
+            case ElementModel(_, properties, _) => properties.collectFirst { case k: KeyProperty[_, _] => k.value.toString }
+            case _                              => None
+          }
+
+          def replace(n: NodeWithKey) = {
+            parent.insertBefore(n.node, nodeWithKey.node)
+            (nodeWithKeys.filter(_ != n), Some(n.node) :: l)
+          }
+
+          def useFirstWithoutKey = rest.find(_.key.isEmpty) match {
+            case Some(n) => replace(n)
+            case None    => replace(NodeWithKey(document.createComment("placeholder"), None))
+          }
+
+          (elementKey, nodeWithKey.key) match {
+            case (Some(ek), nk) if !nk.contains(ek) =>
+              rest.find(_.key.exists(_ == ek)) match {
+                case Some(n) => replace(n)
+                case None    => useFirstWithoutKey
+              }
+            case (None, Some(_))                    => useFirstWithoutKey
+            case _                                  => (rest, Some(nodeWithKey.node) :: l)
+
+          }
+        case _                   => (Nil, None :: l)
+      }
+    }
+    nodeWithKeysRest.map(_.node).foreach(parent.removeChild)
+    val results                   = elementChilds
+      .zip(nodes.reverse)
+      .map((e, existing) => renderInternal(parent, e, existing))
+    ManyResult(results.map(_.node), results.flatMap(_.subscriptions))
+  }
+
+  def renderInternal[T <: ElementChild](
+    parent: Node,
+    elementChild: T,
+    existing: Option[Node] = None
+  )(implicit ev: ClassTag[T]
+  ): Result = {
     def replaceOrAppendChild[T <: Node](node: T, existing: Option[Node]) = {
       existing match {
         case Some(e) => parent.replaceChild(node, e)
@@ -21,54 +80,8 @@ object Renderer {
       }
       node
     }
-    case class NodeWithKey(node: Node, key: Option[String])
 
     elementChild match {
-      case es: Iterable[NodeModel]                  =>
-        val nodeWithKeys              = parent.childNodes.map(node =>
-          NodeWithKey(
-            node,
-            node match {
-              case h: HTMLElement => h.dataset.get(DATA_KEY_NAME)
-              case _              => None
-            }
-          )
-        )
-        val (nodeWithKeysRest, nodes) = es.foldLeft((nodeWithKeys, List.empty[Option[Node]])) { case ((nodeWithKeys, l), e) =>
-          nodeWithKeys match {
-            case nodeWithKey :: rest =>
-              val elementKey              = e match {
-                case ElementModel(_, properties, _) => properties.collectFirst { case k: KeyProperty[_, _] => k.value.toString }
-                case _                              => None
-              }
-              def replace(n: NodeWithKey) = {
-                parent.insertBefore(n.node, nodeWithKey.node)
-                (nodeWithKeys.filter(_ != n), Some(n.node) :: l)
-              }
-
-              def useFirstWithoutKey = rest.find(_.key.isEmpty) match {
-                case Some(n) => replace(n)
-                case None    => replace(NodeWithKey(document.createComment(""), None))
-              }
-
-              (elementKey, nodeWithKey.key) match {
-                case (Some(ek), nk) if !nk.contains(ek) =>
-                  rest.find(_.key.exists(_ == ek)) match {
-                    case Some(n) => replace(n)
-                    case None    => useFirstWithoutKey
-                  }
-                case (None, Some(_))                    => useFirstWithoutKey
-                case _                                  => (rest, Some(nodeWithKey.node) :: l)
-
-              }
-            case _                   => (Nil, None :: l)
-          }
-        }
-        nodeWithKeysRest.map(_.node).foreach(parent.removeChild)
-        val results                   = es
-          .zip(nodes.reverse)
-          .map((e, existing) => renderInternal(parent, e, existing))
-        Result(parent, results.flatMap(_.subscriptions))
       case ElementModel(name, properties, children) =>
         val updates                                = Subject[Element]()
         val element                                = existing match {
@@ -88,6 +101,13 @@ object Renderer {
           .foreach(element.removeAttribute)
         // ref
         properties.collect { case r: RefProperty[Element] => r }.foreach(_.subscriber.onNext(element))
+        element match {
+          case h: HTMLElement =>
+            h.dataset.empty
+            properties
+              .collect { case DataProperty(m) => m }
+              .foreach(_.map { case (name, value) => h.dataset.put(name, value) })
+        }
         properties
           .collect { case k: KeyProperty[Element, _] => k }
           .map(_.value.toString)
@@ -115,8 +135,10 @@ object Renderer {
             .map((e, n) => renderInternal(element, e, n))
             .flatMap(_.subscriptions)
             ++ propertiesSubscriptions
+        if (existing.isDefined) {
+          childNodes.drop(children.size).foreach(element.removeChild)
+        }
 
-        childNodes.drop(children.size).foreach(element.removeChild)
         updates.onNext(element)
         Result(element, subscriptions)
       case s: String                                =>
@@ -127,21 +149,34 @@ object Renderer {
           case _             => replaceOrAppendChild(document.createTextNode(s), existing)
         })
       case o: Observable[NodeModel]                 =>
-        val node: Node   = document.createComment("placeholder")
+        println("en niet hier")
+        val node         = document.createComment("placeholder")
         parent.appendChild(node)
         val subscription = o
           .fold(Result(node))((existing, e) => {
             existing.subscriptions.foreach(_.unsubscribe())
             renderInternal(parent, e, Some(existing.node))
           })
-          .subscribe(new Subscriber[Result] {
-            override def onNext(t: Result): Unit = {}
-
-            override def onCompleted: Unit = {}
+          .subscribe(unitSubscriber[Result])
+        Result(node, List(subscription))
+      case o: Observable[Iterable[NodeModel]]       =>
+        println("hier")
+        val node         = document.createComment("placeholder")
+        parent.appendChild(node)
+        val subscription = o
+          .fold(ManyResult(List(node)))((existing, e) => {
+            existing.subscriptions.foreach(_.unsubscribe())
+            renderInternalMany(parent, e, existing.nodes)
           })
+          .subscribe(unitSubscriber[ManyResult])
         Result(node, List(subscription))
       case _                                        => Result(replaceOrAppendChild(document.createComment("rest"), existing))
     }
   }
-  val DATA_KEY_NAME = "fluxkey"
+  val DATA_KEY_NAME     = "fluxkey"
+  def unitSubscriber[T] = new Subscriber[T] {
+    override def onNext(t: T): Unit = {}
+
+    override def onCompleted: Unit = {}
+  }
 }

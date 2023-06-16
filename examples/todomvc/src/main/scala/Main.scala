@@ -12,16 +12,16 @@ import scala.util.Random
 
 type Key = String
 def createKey(): Key = Random.nextDouble().toString
-case class Filter(selected: Observable[String])(label: String) {
+case class Filter(selected: Observable[String])(title: String) {
   private val clicks = Subject[MouseEvent]()
-  val output         = clicks.mapTo(label)
+  val output         = clicks.mapTo(title)
   val view           = li()(
-    a(onclick := clicks, className := selected.map(s => if (s == label) "selected" else ""), href := "#/")(label)
+    a(onclick := clicks, className := selected.map(s => if (s == title) "selected" else ""), href := "#/")(title)
   )
 }
 
 @JSExportAll
-case class TodoItem(key: Key, completed: Boolean, label: String)
+case class TodoItem(key: Key, completed: Boolean, title: String)
 
 case class State(todos: List[TodoItem], toggleAll: Boolean, edit: Option[Key] = None)
 
@@ -39,7 +39,7 @@ enum Action {
 
 trait TodoItemObject extends js.Object {
   val completed: Boolean
-  val label: String
+  val title: String
 }
 
 import Action.*
@@ -52,7 +52,7 @@ import Action.*
       JSON
         .parse(ts)
         .asInstanceOf[js.Array[TodoItemObject]]
-        .map(o => TodoItem(createKey(), o.completed, o.label))
+        .map(o => TodoItem(createKey(), o.completed, o.title))
         .toList
     }
   val INIT_STATE                 = State(INIT_TODOS, false)
@@ -72,22 +72,22 @@ import Action.*
   val state = actions
     .fold(INIT_STATE) { case (State(todos, toggleAll, e), action) =>
       val newTodos     = action match {
-        case Add(v)                              => TodoItem(createKey(), false, v) :: todos
+        case Add(v)                              => todos :+ TodoItem(createKey(), false, v)
         case SetCompletedAll(completed: Boolean) => todos.map(_.copy(completed = completed))
         case ClearCompleted                      => todos.filterNot(_.completed)
         case Destroy(key)                        => todos.filterNot(_.key == key)
         case Toggle(key)                         =>
           todos.map {
-            case TodoItem(k, completed, label) if k == key => TodoItem(k, !completed, label)
+            case TodoItem(k, completed, title) if k == key => TodoItem(k, !completed, title)
             case t                                         => t
           }
         case ToggleAll                           => todos.map(_.copy(completed = !toggleAll))
-        case Save(key, label)                    =>
-          if (label.trim == "") {
+        case Save(key, title)                    =>
+          if (title.trim == "") {
             todos.filterNot(_.key == key)
           } else {
             todos.map {
-              case TodoItem(k, completed, _) if k == key => TodoItem(k, completed, label.trim())
+              case TodoItem(k, completed, _) if k == key => TodoItem(k, completed, title.trim())
               case t                                     => t
             }
           }
@@ -106,6 +106,7 @@ import Action.*
       }
       State(newTodos, newToggleAll, newEdit)
     }
+    .tap(println)
     .startWith(INIT_STATE)
     .remember()
   val todos = state.map(_.todos).dropRepeats().remember()
@@ -117,7 +118,7 @@ import Action.*
         t.map(ti =>
           new TodoItemObject {
             override val completed: Boolean = ti.completed
-            override val label: ByteString  = ti.label
+            override val title: ByteString  = ti.title
           }
         ).toJSArray
       )
@@ -162,7 +163,7 @@ import Action.*
               onchange  := actions.preProcess(_.mapTo(ToggleAll)),
               checked   := state.map(_.toggleAll)
             )(),
-            label(`for` := "toggle-all")("Mark all as completed"),
+            label(`for` := "toggle-all")("Mark all as complete"),
             Observable
               .combine(state, selectedFilter)
               .map { case (s, f) =>
@@ -187,6 +188,7 @@ import Action.*
                       .combine(state.map(_.edit).filter(_.exists(_ == t.key)))
                       .subscribeNext(_._1._1.focus())
                     li(
+                      data              := Map("testid" -> "todo-item"),
                       onComponentUpdate := componentUpdate,
                       className         := state
                         .map(_.edit)
@@ -204,13 +206,16 @@ import Action.*
                           checked   := t.completed,
                           onchange  := actions.preProcess(_.mapTo(t.key).map(Toggle.apply))
                         )(),
-                        label(ondblclick := actions.preProcess(_.mapTo(t.key).map(Edit.apply)))(t.label),
+                        label(data := Map("testid" -> "todo-title"), ondblclick := actions.preProcess(_.mapTo(t.key).map(Edit.apply)))(
+                          t.title
+                        ),
                         button(className := "destroy", onclick := actions.preProcess(_.mapTo(t.key).map(Destroy.apply)))("")
                       ),
                       input(
                         ref       := inputRef,
+                        ariaLabel := "Edit",
                         className := "edit",
-                        value     := t.label,
+                        value     := t.title,
                         onkeyup   := actions.preProcess(
                           _.filter(_.key == "Enter")
                             .map(_.target.asInstanceOf[HTMLInputElement])
@@ -237,7 +242,11 @@ import Action.*
       if (v) EmptyNode
       else
         footer(className := "footer")(
-          span(className := "todo-count")(strong(todos.map(_.filterNot(_.completed).length).text()), " item left"),
+          div(className := "todo-count")(
+            todos
+              .map(_.filterNot(_.completed).length)
+              .map(c => List(span("items2"), span("items"), strong(c.toString), span(" "), span("item"), span(" left")))
+          ),
           ul(className := "filters")(filters.map(_.view): _*),
           todos
             .map(_.exists(_.completed))

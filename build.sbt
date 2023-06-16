@@ -30,7 +30,7 @@ lazy val core = project
 lazy val core_new = project
   .enablePlugins(ScalaJSPlugin)
   .settings(
-    scalacOptions ++= Seq("-deprecation", "-feature", "-language:implicitConversions"),
+    scalacOptions ++= Seq("-deprecation", "-feature", "-Xfatal-warnings"),
     libraryDependencies ++= Seq(
       "org.scala-js"  %%% "scalajs-dom" % scalajsDomVersion,
       "org.scalatest" %%% "scalatest"   % scalatestVersion % Test

@@ -28,9 +28,6 @@ class RendererTest extends AnyFunSuite with Matchers with BeforeAndAfterEach {
               case AttributeProperty(name, value: Boolean) if value                       => name -> ""
               case AttributeProperty(name, value: Any) if name != "key" && value != false => name -> value
             }.toMap
-//            e match {
-//              case h: HTMLElement => println(h.style.clip)
-//            }
             attributes should contain theSameElementsAs e.attributes.view.mapValues(_.value).filterKeys(!_.startsWith("data-"))
             check(e.childNodes, children.toSeq: _*)
           case (t: Text, s: String)                                   => t.wholeText shouldBe s
@@ -89,6 +86,13 @@ class RendererTest extends AnyFunSuite with Matchers with BeforeAndAfterEach {
     checkElement(List("test", e2, e1))
     checkElement(List(e2, "test", e1))
     checkElement(List(e2, e1, "test"))
+  }
+  test("simple observable list in element") {
+    val subject            = Observable.once(1)
+    def createView(c: Int) = List(strong(c.toString), span("item"))
+    Renderer.render(document.body, div()(subject.map(createView)))
+
+    checkElementChild(div()(createView(1): _*))
   }
 
   test("replace String") {
