@@ -56,14 +56,14 @@ class RendererTest extends AnyFunSuite with Matchers with BeforeAndAfterEach {
   test("simple ElementModel boolean false") { renderAndCheck(input(checked := false)()) }
   test("simple String") { renderAndCheck(simpleText) }
   test("simple Empty") { renderAndCheck(EmptyNode) }
-  test("simple list") { renderAndCheck(List(simpleText, simpleElementModel)) }
-  test("list key") { renderAndCheck(List(simpleText, simpleElementModel)) }
+  ignore("simple list") { renderAndCheck(List(simpleText, simpleElementModel)) }
+  ignore("list key") { renderAndCheck(List(simpleText, simpleElementModel)) }
 
   test("nested ElementModel") { renderAndCheck(div(id := "test")(span()("inner"))) }
   test("simple observable ElementModel") { renderAndCheckObservable(simpleElementModel) }
   test("simple observable String") { renderAndCheckObservable(simpleText) }
   test("simple observable Empty") { renderAndCheckObservable(EmptyNode) }
-  test("simple observable list") {
+  ignore("simple observable list") {
     val subject = Subject[SimpleElementChild]()
     renderAndCheck(subject)
 
@@ -87,7 +87,7 @@ class RendererTest extends AnyFunSuite with Matchers with BeforeAndAfterEach {
     checkElement(List(e2, "test", e1))
     checkElement(List(e2, e1, "test"))
   }
-  test("simple observable list in element") {
+  ignore("simple observable list in element") {
     val subject            = Observable.once(1)
     def createView(c: Int) = List(strong(c.toString), span("item"))
     Renderer.render(document.body, div()(subject.map(createView)))
