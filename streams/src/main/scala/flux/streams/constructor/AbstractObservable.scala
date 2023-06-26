@@ -2,7 +2,7 @@ package flux.streams.constructor
 
 import flux.streams.{Observable, Subscriber, Subscription}
 
-abstract class AbstractObservable[T] extends Observable[T] {
+abstract class AbstractObservable[T] extends Observable[T]() {
   private var subscribers = List.empty[Subscriber[T]]
 
   def onStart(): Unit

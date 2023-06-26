@@ -1,39 +1,36 @@
-package flux
-
-import flux.streams.{Observable, Subscriber, Subscription}
-import flux.web.AttributeName
+import flux.streams.constructor.AbstractObservable
+import flux.streams.{Observable, Subscriber}
 import org.scalajs.dom.*
 
-package object web {
-  trait Property[-T]
-  case class AttributeProperty[T, V](name: String, value: V)                            extends Property[T]
-  case class ObservableAttributeProperty[T, V](name: String, observable: Observable[V]) extends Property[T]
-  case class RefProperty[T <: Element](subscriber: Subscriber[T])                       extends Property[T]
-  case class KeyProperty[T <: Element, V](value: V)                                     extends Property[T]
-  case class DataProperty[T <: Element](m: Map[String, String])                         extends Property[T]
-  case class OnComponentUpdateProperty[T <: Element](subscriber: Subscriber[T])         extends Property[T]
-  case class EventProperty[T, V <: Event](event: String, v: Subscriber[V])              extends Property[T]
-  trait AttributeName[T, V](name: String)       {
-    def :=(v: V)             = AttributeProperty[T, V](name, v)
-    def :=(v: Observable[V]) = ObservableAttributeProperty[T, V](name, v)
-  }
-  trait EventName[T, V <: Event](event: String) {
-    def :=(v: Subscriber[V]) = EventProperty[T, V](event, v)
-  }
+import scala.collection.AbstractIterable
+import scala.collection.immutable.AbstractSeq
+
+package object flux {
+  type AtomicModel  = String | ElementModel | EmptyNode.type
+  type ElementChild = AtomicModel | Observable[AtomicModel | AbstractIterable[AtomicModel]]
 
   case object EmptyNode
 
-  type NodeModel    = String | ElementModel[_] | EmptyNode.type
-  type ElementChild = NodeModel | Iterable[NodeModel] | Observable[NodeModel] | Observable[Iterable[NodeModel]]
-
-  case class ElementModel[T <: Element](name: String, properties: Iterable[Property[T]], children: Iterable[ElementChild])
-
-  trait ElementModelFactory[T <: Element](name: String)                                                   {
-    def apply(children: ElementChild*): ElementModel[T] = ElementModel(name, Nil, children)
-    def apply(properties: Property[T]*)                 = ElementModelFactoryWithoutChildren[T](name, properties)
+  trait Property[-T]
+  case class AttributeProperty[T, V](name: String, value: V) extends Property[T]
+  trait AttributeName[T, V](name: String)       {
+    def :=(v: V) = AttributeProperty[T, V](name, v)
   }
+  case class EventProperty[T, V <: Event](event: String, v: Subscriber[V]) extends Property[T]
+  trait EventName[T, V <: Event](event: String) {
+    def :=(v: Subscriber[V]) = EventProperty[T, V](event, v)
+  }
+  case class RefProperty[T <: Element](subscriber: Subscriber[T]) extends Property[T]
+
+  case class ElementModel(name: String, properties: Iterable[Property[_]], children: Iterable[ElementChild])
+
+  trait ElementModelFactory[T <: Element](name: String) {
+    def apply(children: ElementChild*): ElementModel = ElementModel(name, Nil, children)
+    def apply(properties: Property[T]*)              = ElementModelFactoryWithoutChildren[T](name, properties)
+  }
+
   class ElementModelFactoryWithoutChildren[T <: Element](name: String, properties: Iterable[Property[T]]) {
-    def apply(children: ElementChild*): ElementModel[T] = ElementModel(name, properties, children)
+    def apply(children: ElementChild*): ElementModel = ElementModel(name, properties, children)
   }
 
   case object ul      extends ElementModelFactory[HTMLElement]("ul")
@@ -66,17 +63,6 @@ package object web {
   case object ref {
     def :=[T <: Element](s: Subscriber[T]) = RefProperty[T](s)
   }
-  case object key {
-    def :=[T <: Element, V](value: V) = KeyProperty[T, V](value)
-  }
-
-  case object data {
-    def :=[T <: Element](m: Map[String, String]) = DataProperty[T](m)
-  }
-
-  case object onComponentUpdate {
-    def :=[T <: Element](s: Subscriber[T]) = OnComponentUpdateProperty[T](s)
-  }
 
   case object onchange   extends EventName[HTMLElement, Event]("change")
   case object onkeydown  extends EventName[HTMLElement, KeyboardEvent]("keydown")
@@ -84,4 +70,5 @@ package object web {
   case object ondblclick extends EventName[HTMLElement, MouseEvent]("dblclick")
   case object onblur     extends EventName[HTMLElement, FocusEvent]("blur")
   case object onkeyup    extends EventName[HTMLElement, KeyboardEvent]("keyup")
+
 }

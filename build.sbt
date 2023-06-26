@@ -39,6 +39,30 @@ lazy val core_new = project
   )
   .dependsOn(streams)
 
+lazy val core_new2 = project
+  .enablePlugins(ScalaJSPlugin)
+  .settings(
+    scalacOptions ++= Seq("-deprecation", "-feature", "-Xfatal-warnings"),
+    libraryDependencies ++= Seq(
+      "org.scala-js"  %%% "scalajs-dom" % scalajsDomVersion,
+      "org.scalatest" %%% "scalatest"   % scalatestVersion % Test
+    ),
+    jsEnv := new org.scalajs.jsenv.jsdomnodejs.JSDOMNodeJSEnv()
+  )
+  .dependsOn(streams)
+
+lazy val core_new3 = project
+  .enablePlugins(ScalaJSPlugin)
+  .settings(
+    scalacOptions ++= Seq("-deprecation", "-feature", "-Xfatal-warnings"),
+    libraryDependencies ++= Seq(
+      "org.scala-js"  %%% "scalajs-dom" % scalajsDomVersion,
+      "org.scalatest" %%% "scalatest"   % scalatestVersion % Test
+    ),
+    jsEnv := new org.scalajs.jsenv.jsdomnodejs.JSDOMNodeJSEnv()
+  )
+  .dependsOn(streams)
+
 //lazy val example = project
 //  .enablePlugins(ScalaJSPlugin)
 //  .settings(

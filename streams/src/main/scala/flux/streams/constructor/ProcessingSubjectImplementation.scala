@@ -3,8 +3,8 @@ package flux.streams.constructor
 import flux.streams.{Observable, Subscriber, Subscription}
 
 case class ProcessingSubjectImplementation[S, O](subscriber: Subscriber[S], observable: Observable[O])
-    extends Subscriber[S]
-    with Observable[O] {
+    extends Observable[O]()
+    with Subscriber[S] {
   override def onNext(t: S): Unit = subscriber.onNext(t)
 
   override def onCompleted: Unit = subscriber.onCompleted

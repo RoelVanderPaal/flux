@@ -7,7 +7,7 @@ import org.scalajs.dom.*
 import scala.reflect.ClassTag
 
 object Renderer {
-  def render[T <: ElementChild](parent: Node, elementChild: T)(implicit ev: ClassTag[T]): Unit = {
+  def render(parent: Node, elementChild: ElementChild): Unit = {
     renderInternal(parent, elementChild)
   }
 
@@ -67,11 +67,10 @@ object Renderer {
     ManyResult(results.map(_.node), results.flatMap(_.subscriptions))
   }
 
-  def renderInternal[T <: ElementChild](
+  def renderInternal(
     parent: Node,
-    elementChild: T,
+    elementChild: ElementChild,
     existing: Option[Node] = None
-  )(implicit ev: ClassTag[T]
   ): Result = {
     def replaceOrAppendChild[T <: Node](node: T, existing: Option[Node]) = {
       existing match {
@@ -148,28 +147,39 @@ object Renderer {
             t
           case _             => replaceOrAppendChild(document.createTextNode(s), existing)
         })
-      case o: Observable[NodeModel]                 =>
-        println("en niet hier")
-        val node         = document.createComment("placeholder")
-        parent.appendChild(node)
-        val subscription = o
-          .fold(Result(node))((existing, e) => {
-            existing.subscriptions.foreach(_.unsubscribe())
-            renderInternal(parent, e, Some(existing.node))
-          })
-          .subscribe(unitSubscriber[Result])
-        Result(node, List(subscription))
-      case o: Observable[Iterable[NodeModel]]       =>
-        println("hier")
-        val node         = document.createComment("placeholder")
-        parent.appendChild(node)
-        val subscription = o
-          .fold(ManyResult(List(node)))((existing, e) => {
-            existing.subscriptions.foreach(_.unsubscribe())
-            renderInternalMany(parent, e, existing.nodes)
-          })
-          .subscribe(unitSubscriber[ManyResult])
-        Result(node, List(subscription))
+//      case o: Observable[_]                         =>
+//        println("en niet hier")
+//        val node         = document.createComment("placeholder")
+//        parent.appendChild(node)
+//        val subscription = o
+//          .fold(Result(node))((existing, e) => {
+//            existing.subscriptions.foreach(_.unsubscribe())
+//            renderInternal(parent, e, Some(existing.node))
+//          })
+//          .subscribe(unitSubscriber[Result])
+//        Result(node, List(subscription))
+//      case o: Observable[Iterable[NodeModel]]       =>
+//        println("hier")
+//        val node         = document.createComment("placeholder")
+//        parent.appendChild(node)
+//        val subscription = o
+//          .fold(ManyResult(List(node)))((existing, e) => {
+//            existing.subscriptions.foreach(_.unsubscribe())
+//            renderInternalMany(parent, e, existing.nodes)
+//          })
+//          .subscribe(unitSubscriber[ManyResult])
+//        Result(node, List(subscription))
+      case o: Observable[Any]                       =>
+        Result(parent, Nil)
+        o.subscribe(new Subscriber[Any] {
+          override def onNext(t: Any): Unit = t match {
+            case l: List[_] =>
+            case _          =>
+          }
+
+          override def onCompleted: Unit = ???
+        })
+        Result(parent, Nil)
       case _                                        => Result(replaceOrAppendChild(document.createComment("rest"), existing))
     }
   }

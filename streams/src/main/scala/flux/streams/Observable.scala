@@ -7,7 +7,7 @@ import org.scalajs.dom.{Event, EventTarget}
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
-trait Observable[+T] {
+abstract class Observable[+T]() {
   def subscribe[S >: T](subscriber: Subscriber[S]): Subscription
   def unsubscribe[S >: T](subscriber: Subscriber[S]): Unit
   def debug: String
@@ -25,11 +25,12 @@ trait Observable[+T] {
   def combine[T2](o2: Observable[T2]): Observable[(T, T2)]                                = CombineOperator(this, o2)
   def dropRepeats(isEqual: (T, T) => Boolean = (t1: T, t2: T) => t1 == t2): Observable[T] = DropRepeatsOperator(this, isEqual)
 
-  def subscribeNext(f: T => Unit) = this.subscribe(new Subscriber[T] {
+  def subscribeNext(f: T => Unit): Subscription = this.subscribe(new Subscriber[T] {
     override def onNext(t: T): Unit = f(t)
 
     override def onCompleted: Unit = {}
   })
+  def drain(): Subscription                     = subscribeNext(_ => {})
 }
 
 object Observable {
