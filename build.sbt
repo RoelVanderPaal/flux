@@ -4,10 +4,11 @@ ThisBuild / scalaVersion := "3.3.0"
 
 val scalajsDomVersion = "2.6.0"
 val scalatestVersion  = "3.2.16"
+val options           = Seq("-deprecation", "-feature", "-Xfatal-warnings", "-unchecked", "-no-indent", "-old-syntax")
 lazy val streams      = project
   .enablePlugins(ScalaJSPlugin)
   .settings(
-    scalacOptions ++= Seq("-deprecation", "-feature", "-language:implicitConversions"),
+    scalacOptions ++= options,
     libraryDependencies ++= Seq(
       "org.scala-js"  %%% "scalajs-dom" % scalajsDomVersion,
       "org.scalatest" %%% "scalatest"   % scalatestVersion % Test
@@ -42,7 +43,7 @@ lazy val core_new = project
 lazy val core_new2 = project
   .enablePlugins(ScalaJSPlugin)
   .settings(
-    scalacOptions ++= Seq("-deprecation", "-feature", "-Xfatal-warnings"),
+    scalacOptions ++= options,
     libraryDependencies ++= Seq(
       "org.scala-js"  %%% "scalajs-dom" % scalajsDomVersion,
       "org.scalatest" %%% "scalatest"   % scalatestVersion % Test
@@ -54,7 +55,7 @@ lazy val core_new2 = project
 lazy val core_new3 = project
   .enablePlugins(ScalaJSPlugin)
   .settings(
-    scalacOptions ++= Seq("-deprecation", "-feature", "-Xfatal-warnings"),
+    scalacOptions ++= options,
     libraryDependencies ++= Seq(
       "org.scala-js"  %%% "scalajs-dom" % scalajsDomVersion,
       "org.scalatest" %%% "scalatest"   % scalatestVersion % Test
@@ -78,4 +79,4 @@ lazy val todomvc = (project in file("examples/todomvc"))
     scalacOptions ++= Seq("-deprecation", "-feature", "-language:implicitConversions"),
     scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.ESModule).withModuleSplitStyle(ModuleSplitStyle.SmallModulesFor(List("todomvc"))) }
   )
-  .dependsOn(core_new)
+  .dependsOn(core_new3)

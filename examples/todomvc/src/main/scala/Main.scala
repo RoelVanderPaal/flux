@@ -1,6 +1,6 @@
+import flux.*
 import flux.streams.constructor.EventListenerObservable
 import flux.streams.{Observable, RememberSubject, Subject, Subscriber}
-import flux.web.*
 import org.scalajs.dom.*
 
 import java.util.UUID
@@ -29,11 +29,11 @@ enum Action {
   case Add(value: String)
   case SetCompletedAll(completed: Boolean)
   case ClearCompleted
-  case Destroy(key: Key)
+  case Destroy
   case Toggle(key: Key)
   case ToggleAll
   case Edit(key: Key)
-  case Save(key: Key, value: String)
+  case Save(value: String)
   case ExitEdit
 }
 
@@ -71,26 +71,25 @@ import Action.*
 
   val state = actions
     .fold(INIT_STATE) { case (State(todos, toggleAll, e), action) =>
+      println(action)
       val newTodos     = action match {
         case Add(v)                              => todos :+ TodoItem(createKey(), false, v)
         case SetCompletedAll(completed: Boolean) => todos.map(_.copy(completed = completed))
         case ClearCompleted                      => todos.filterNot(_.completed)
-        case Destroy(key)                        => todos.filterNot(_.key == key)
+        case Destroy                             => e.map(key => todos.filterNot(_.key == key)).getOrElse(todos)
         case Toggle(key)                         =>
           todos.map {
             case TodoItem(k, completed, title) if k == key => TodoItem(k, !completed, title)
             case t                                         => t
           }
         case ToggleAll                           => todos.map(_.copy(completed = !toggleAll))
-        case Save(key, title)                    =>
-          if (title.trim == "") {
-            todos.filterNot(_.key == key)
-          } else {
+        case Save(title)                         =>
+          e.map(key =>
             todos.map {
-              case TodoItem(k, completed, _) if k == key => TodoItem(k, completed, title.trim())
+              case TodoItem(k, completed, _) if k == key => TodoItem(k, completed, title)
               case t                                     => t
             }
-          }
+          ).getOrElse(todos)
         case _                                   => todos
       }
       val newToggleAll = action match {
@@ -99,10 +98,10 @@ import Action.*
         case _              => newTodos.nonEmpty && newTodos.forall(_.completed)
       }
       val newEdit      = action match {
-        case Edit(ne)   => Some(ne)
-        case ExitEdit   => None
-        case Save(_, _) => None
-        case _          => e
+        case Edit(ne) => Some(ne)
+        case ExitEdit => None
+        case Save(_)  => None
+        case _        => e
       }
       State(newTodos, newToggleAll, newEdit)
     }
@@ -158,10 +157,10 @@ import Action.*
           section(className := "main")(
             input(
               id        := "toggle-all",
+              checked   := state.map(_.toggleAll),
               className := "toggle-all",
               `type`    := "checkbox",
-              onchange  := actions.preProcess(_.mapTo(ToggleAll)),
-              checked   := state.map(_.toggleAll)
+              onchange  := actions.preProcess(_.mapTo(ToggleAll))
             )(),
             label(`for` := "toggle-all")("Mark all as complete"),
             Observable
@@ -184,13 +183,12 @@ import Action.*
                     val inputRef        = Subject[HTMLElement]()
                     val componentUpdate = Subject[HTMLElement]()
                     inputRef
-                      .combine(componentUpdate)
+//                      .combine(componentUpdate)
                       .combine(state.map(_.edit).filter(_.exists(_ == t.key)))
-                      .subscribeNext(_._1._1.focus())
+                      .subscribeNext(_._1.focus())
                     li(
-                      data              := Map("testid" -> "todo-item"),
-                      onComponentUpdate := componentUpdate,
-                      className         := state
+                      data      := Map("testid" -> "todo-item"),
+                      className := state
                         .map(_.edit)
                         .map(edit =>
                           List(
@@ -201,6 +199,7 @@ import Action.*
                     )(
                       div(className := "view")(
                         input(
+                          id        := t.title,
                           className := "toggle",
                           `type`    := "checkbox",
                           checked   := t.completed,
@@ -209,7 +208,7 @@ import Action.*
                         label(data := Map("testid" -> "todo-title"), ondblclick := actions.preProcess(_.mapTo(t.key).map(Edit.apply)))(
                           t.title
                         ),
-                        button(className := "destroy", onclick := actions.preProcess(_.mapTo(t.key).map(Destroy.apply)))("")
+                        button(className := "destroy", onclick := actions.preProcess(_.mapTo(t.key).map(_ => Destroy)))("")
                       ),
                       input(
                         ref       := inputRef,
@@ -221,14 +220,14 @@ import Action.*
                             .map(_.target.asInstanceOf[HTMLInputElement])
                             .map(e => {
                               val trim = e.value.trim
-                              if (trim == "") Destroy(t.key) else Save(t.key, trim)
+                              if (trim == "") Destroy else Save(trim)
                             })
                         ),
                         onblur    := actions.preProcess(
                           _.map(_.target.asInstanceOf[HTMLInputElement])
                             .map(e => {
                               val trim = e.value.trim
-                              if (trim == "") Destroy(t.key) else Save(t.key, trim)
+                              if (trim == "") Destroy else Save(trim)
                             })
                         )
                       )()
@@ -242,10 +241,10 @@ import Action.*
       if (v) EmptyNode
       else
         footer(className := "footer")(
-          div(className := "todo-count")(
+          div(className := "todo-count", data := Map("testid" -> "todo-count"))(
             todos
               .map(_.filterNot(_.completed).length)
-              .map(c => List(span("items2"), span("items"), strong(c.toString), span(" "), span("item"), span(" left")))
+              .map(c => List(strong(c.toString), span(" "), if (c > 1) span("items") else span("item"), span(" left")))
           ),
           ul(className := "filters")(filters.map(_.view): _*),
           todos

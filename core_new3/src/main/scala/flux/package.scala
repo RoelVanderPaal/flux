@@ -6,31 +6,42 @@ import scala.collection.AbstractIterable
 import scala.collection.immutable.AbstractSeq
 
 package object flux {
-  type AtomicModel  = String | ElementModel | EmptyNode.type
+  type AtomicModel  = String | ElementModel[_] | EmptyNode.type
   type ElementChild = AtomicModel | Observable[AtomicModel | AbstractIterable[AtomicModel]]
 
   case object EmptyNode
 
-  trait Property[-T]
-  case class AttributeProperty[T, V](name: String, value: V) extends Property[T]
-  trait AttributeName[T, V](name: String)       {
-    def :=(v: V) = AttributeProperty[T, V](name, v)
+  trait Property[-T <: Element]
+  case class PropertyProperty[T <: Element, V](setter: (T, V) => Unit, value: V)                            extends Property[T]
+  case class ObservablePropertyProperty[T <: Element, V](setter: (T, V) => Unit, observable: Observable[V]) extends Property[T]
+  case class AttributeProperty[T <: Element, V](name: String, value: V)                                     extends Property[T]
+  case class ObservableAttributeProperty[T <: Element, V](name: String, observable: Observable[V])          extends Property[T]
+
+  case class EventProperty[T <: Element, V <: Event](event: String, v: Subscriber[V]) extends Property[T]
+  case class RefProperty[T <: Element](subscriber: Subscriber[T])                     extends Property[T]
+  case class DataProperty[T <: Element](m: Map[String, String])                       extends Property[T]
+  trait AttributeName[T <: Element, V](name: String)       {
+    def :=(v: V)             = AttributeProperty[T, V](name, v)
+    def :=(v: Observable[V]) = ObservableAttributeProperty[T, V](name, v)
   }
-  case class EventProperty[T, V <: Event](event: String, v: Subscriber[V]) extends Property[T]
-  trait EventName[T, V <: Event](event: String) {
+  trait EventName[T <: Element, V <: Event](event: String) {
     def :=(v: Subscriber[V]) = EventProperty[T, V](event, v)
   }
-  case class RefProperty[T <: Element](subscriber: Subscriber[T]) extends Property[T]
 
-  case class ElementModel(name: String, properties: Iterable[Property[_]], children: Iterable[ElementChild])
+  case class ElementModel[T <: Element](name: String, properties: Iterable[Property[T]], children: Iterable[ElementChild])
 
   trait ElementModelFactory[T <: Element](name: String) {
-    def apply(children: ElementChild*): ElementModel = ElementModel(name, Nil, children)
-    def apply(properties: Property[T]*)              = ElementModelFactoryWithoutChildren[T](name, properties)
+    def apply(children: ElementChild*): ElementModel[T]                        = ElementModel(name, Nil, children)
+    def apply(properties: Property[T]*): ElementModelFactoryWithoutChildren[T] = ElementModelFactoryWithoutChildren[T](name, properties)
   }
 
   class ElementModelFactoryWithoutChildren[T <: Element](name: String, properties: Iterable[Property[T]]) {
-    def apply(children: ElementChild*): ElementModel = ElementModel(name, properties, children)
+    def apply(children: ElementChild*): ElementModel[T] = ElementModel(name, properties, children)
+  }
+
+  trait PropertyName[T <: Element, V](setter: (T, V) => Unit) {
+    def :=(v: V)             = PropertyProperty[T, V](setter, v)
+    def :=(v: Observable[V]) = ObservablePropertyProperty[T, V](setter, v)
   }
 
   case object ul      extends ElementModelFactory[HTMLElement]("ul")
@@ -39,7 +50,7 @@ package object flux {
   case object section extends ElementModelFactory[HTMLElement]("section")
   case object header  extends ElementModelFactory[HTMLElement]("header")
   case object h1      extends ElementModelFactory[HTMLElement]("h1")
-  case object a       extends ElementModelFactory[HTMLElement]("a")
+  case object a       extends ElementModelFactory[HTMLAnchorElement]("a")
   case object strong  extends ElementModelFactory[HTMLElement]("strong")
   case object span    extends ElementModelFactory[HTMLElement]("span")
   case object footer  extends ElementModelFactory[HTMLElement]("footer")
@@ -47,8 +58,9 @@ package object flux {
   case object input   extends ElementModelFactory[HTMLInputElement]("input")
   case object button  extends ElementModelFactory[HTMLButtonElement]("button")
 
-  case object href        extends AttributeName[Element, String]("href")
-  case object checked     extends AttributeName[HTMLInputElement, Boolean]("checked")
+  case object href    extends AttributeName[HTMLAnchorElement, String]("href")
+  case object checked extends PropertyName[HTMLInputElement, Boolean]((e, v) => e.checked = v)
+
   case object className   extends AttributeName[Element, String]("class")
   case object autofocus   extends AttributeName[HTMLElement, Boolean]("autofocus")
   case object id          extends AttributeName[Element, String]("id")
@@ -60,8 +72,11 @@ package object flux {
   case object ariaLabel   extends AttributeName[Element, String]("aria-label")
   case object disabled    extends AttributeName[HTMLInputElement | HTMLButtonElement, Boolean]("disabled")
 
-  case object ref {
+  case object ref  {
     def :=[T <: Element](s: Subscriber[T]) = RefProperty[T](s)
+  }
+  case object data {
+    def :=[T <: Element](m: Map[String, String]) = DataProperty[T](m)
   }
 
   case object onchange   extends EventName[HTMLElement, Event]("change")

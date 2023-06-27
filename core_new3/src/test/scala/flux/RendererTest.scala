@@ -26,7 +26,7 @@ class RendererTest extends AnyFunSuite with Matchers with BeforeAndAfterEach {
             attributes should contain theSameElementsAs e.attributes.view.mapValues(_.value).filterKeys(!_.startsWith("data-"))
 
             checkElementChildren(children, e.childNodes)
-          case (t: Text, s: ElementModel)                             => fail(t.wholeText + " " + s)
+          case (t: Text, s: ElementModel[_])                             => fail(t.wholeText + " " + s)
           case (t: Text, s: String)                                   => t.wholeText shouldBe s
           case (c: Comment, EmptyNode)                                => c.data shouldBe "empty"
           case (c: Comment, o: Observable[_])                         => c.data shouldBe "placeholder"
